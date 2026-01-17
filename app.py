@@ -10,9 +10,23 @@ import uuid
 try:
     import cv2
     CV2_AVAILABLE = True
-except ImportError:
+    print(f"OpenCV导入成功，版本: {cv2.__version__}")
+except ImportError as e:
     CV2_AVAILABLE = False
-    print("警告: OpenCV未安装，视频缩略图功能将被禁用。安装: pip install opencv-python")
+    print(f"警告: OpenCV导入失败: {e}")
+    print("视频缩略图功能将被禁用。")
+    print("诊断信息:")
+    import sys
+    print(f"Python版本: {sys.version}")
+    try:
+        import importlib.util
+        spec = importlib.util.find_spec("cv2")
+        if spec:
+            print(f"cv2模块位置: {spec.origin}")
+        else:
+            print("cv2模块未找到")
+    except Exception as e2:
+        print(f"查找cv2模块失败: {e2}")
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
