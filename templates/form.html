@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI内容生成记录系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .header {
+            text-align: center;
+            padding: 48px 40px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            margin-bottom: 8px;
+        }
+
+        .form-content {
+            padding: 40px;
+        }
+
+        .form-group {
+            margin-bottom: 28px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+
+        .form-group label .required {
+            color: #d13438;
+            margin-left: 4px;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="datetime-local"],
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            background: white;
+        }
+
+        .form-group input[type="text"]:hover,
+        .form-group input[type="datetime-local"]:hover,
+        .form-group textarea:hover {
+            border-color: rgba(0, 0, 0, 0.3);
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #0067c0;
+            box-shadow: 0 0 0 2px rgba(0, 103, 192, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+            line-height: 1.6;
+        }
+
+        .file-upload {
+            border: 2px dashed rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+            padding: 32px;
+            text-align: center;
+            transition: all 0.2s ease;
+            background: rgba(249, 249, 249, 0.8);
+        }
+
+        .file-upload:hover {
+            border-color: rgba(0, 0, 0, 0.3);
+            background: rgba(243, 243, 243, 0.9);
+        }
+
+        .file-upload input[type="file"] {
+            display: none;
+        }
+
+        .file-upload-label {
+            cursor: pointer;
+            color: #0067c0;
+            font-weight: 500;
+            font-size: 14px;
+            transition: color 0.2s ease;
+        }
+
+        .file-upload-label:hover {
+            color: #005a9e;
+            text-decoration: underline;
+        }
+
+        .file-list {
+            margin-top: 12px;
+            text-align: left;
+        }
+
+        .file-item {
+            background: white;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            transition: all 0.2s ease;
+        }
+
+        .file-item:hover {
+            background: #f9f9f9;
+            border-color: rgba(0, 0, 0, 0.15);
+        }
+
+        .file-item .file-name {
+            font-size: 13px;
+            color: #1a1a1a;
+            font-weight: 500;
+        }
+
+        .file-item .file-size {
+            font-size: 12px;
+            color: #6e6e6e;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background: #0067c0;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            letter-spacing: 0.3px;
+        }
+
+        .btn-submit:hover {
+            background: #005a9e;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 103, 192, 0.25);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+            background: #004578;
+        }
+
+        .alert {
+            padding: 14px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background: #dff6dd;
+            color: #107c10;
+            border: 1px solid #badfcc;
+        }
+
+        .alert-error {
+            background: #fde7e9;
+            color: #d13438;
+            border: 1px solid #f5c6cb;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 20px 10px;
+            }
+
+            .container {
+                margin: 0;
+                border-radius: 0;
+            }
+
+            .header {
+                padding: 32px 24px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .form-content {
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI内容生成记录系统</h1>
+            <p>记录和管理您的AI生成内容</p>
+        </div>
+
+        <div class="form-content">
+            <div id="alert"></div>
+
+            <form id="recordForm">
+                <div class="form-group">
+                    <label for="title">
+                        内容标题
+                        <span class="required">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="title"
+                        name="title"
+                        placeholder="请输入内容标题"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="app_id">
+                        应用ID
+                        <span class="required">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="app_id"
+                        name="app_id"
+                        placeholder="请输入应用ID（如：stable_diffusion, midjourney等）"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="datetime">
+                        生成日期时间
+                        <span class="required">*</span>
+                    </label>
+                    <input
+                        type="datetime-local"
+                        id="datetime"
+                        name="datetime"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="prompt">
+                        参数信息
+                        <span class="required">*</span>
+                    </label>
+                    <textarea
+                        id="prompt"
+                        name="prompt"
+                        placeholder="请输入参数信息，支持以下格式：&#10;&#10;提示词: 一只可爱的猫咪&#10;负向提示词: 模糊, 低质量&#10;分辨率: 1024x1024&#10;随机种子: 42&#10;采样步数: 30&#10;CFG Scale: 7.5&#10;采样器: DPM++ 2M Karras&#10;模型: SDXL 1.0&#10;&#10;也支持直接输入纯文本提示词"
+                        required
+                    ></textarea>
+                    <div style="margin-top: 8px; font-size: 12px; color: #6e6e6e;">
+                        支持结构化参数（key: value格式）和纯文本提示词
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>素材文件</label>
+                    <div class="file-upload">
+                        <input
+                            type="file"
+                            id="materials"
+                            name="materials"
+                            multiple
+                            accept=".txt,.md,.csv,.json,.xml,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg,.mp4,.avi,.mov,.mkv,.webm,.flv"
+                        >
+                        <label for="materials" class="file-upload-label">
+                            点击选择素材文件或拖拽文件到此处
+                        </label>
+                        <div style="margin-top: 10px; font-size: 12px; color: #718096;">
+                            支持文本、图片、视频文件
+                        </div>
+                        <div id="materialsList" class="file-list"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>生成的结果文件</label>
+                    <div class="file-upload">
+                        <input
+                            type="file"
+                            id="results"
+                            name="results"
+                            multiple
+                            accept=".txt,.md,.csv,.json,.xml,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg,.mp4,.avi,.mov,.mkv,.webm,.flv"
+                        >
+                        <label for="results" class="file-upload-label">
+                            点击选择结果文件或拖拽文件到此处
+                        </label>
+                        <div style="margin-top: 10px; font-size: 12px; color: #718096;">
+                            支持文本、图片、视频文件
+                        </div>
+                        <div id="resultsList" class="file-list"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit">提交记录</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // 设置默认时间为当前时间
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('datetime').value = now.toISOString().slice(0, 16);
+
+        // 文件选择显示
+        function setupFileDisplay(inputId, listId) {
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(listId);
+
+            input.addEventListener('change', function() {
+                list.innerHTML = '';
+                const files = this.files;
+
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const size = (file.size / 1024).toFixed(2) + ' KB';
+
+                    const item = document.createElement('div');
+                    item.className = 'file-item';
+                    item.innerHTML = `
+                        <span class="file-name">${file.name}</span>
+                        <span class="file-size">${size}</span>
+                    `;
+                    list.appendChild(item);
+                }
+            });
+        }
+
+        setupFileDisplay('materials', 'materialsList');
+        setupFileDisplay('results', 'resultsList');
+
+        // 表单提交
+        document.getElementById('recordForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const alertDiv = document.getElementById('alert');
+            const formData = new FormData(this);
+
+            try {
+                const response = await fetch('/submit', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alertDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            ✓ ${result.message}
+                        </div>
+                    `;
+
+                    // 3秒后重置表单
+                    setTimeout(() => {
+                        this.reset();
+                        document.getElementById('materialsList').innerHTML = '';
+                        document.getElementById('resultsList').innerHTML = '';
+                        alertDiv.innerHTML = '';
+                        // 重置时间为当前时间
+                        const now = new Date();
+                        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                        document.getElementById('datetime').value = now.toISOString().slice(0, 16);
+                    }, 3000);
+                } else {
+                    alertDiv.innerHTML = `
+                        <div class="alert alert-error">
+                            ✗ ${result.error}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                alertDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        ✗ 提交失败: ${error.message}
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

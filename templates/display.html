@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - AI内容生成记录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI Variable', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: #f3f3f3;
+            padding: 32px 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(32, 32, 32, 0.95);
+            color: white;
+            padding: 48px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .header .meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 16px;
+            opacity: 0.75;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .meta-icon {
+            font-size: 16px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #0067c0;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #6e6e6e;
+            font-weight: 500;
+        }
+
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 32px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-icon {
+            font-size: 20px;
+        }
+
+        .prompt-box {
+            background: #f9f9f9;
+            border-left: 3px solid #0067c0;
+            padding: 20px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            color: #1a1a1a;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        .parameters-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .parameter-item {
+            background: #f9f9f9;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            border-radius: 6px;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .parameter-item.parameter-prompt {
+            background: white;
+            border-left: 3px solid #0067c0;
+            padding: 16px 20px;
+        }
+
+        .parameter-item.small {
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .parameter-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #6e6e6e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .parameter-item.parameter-prompt .parameter-label {
+            font-size: 14px;
+            color: #0067c0;
+        }
+
+        .parameter-value {
+            font-size: 14px;
+            color: #1a1a1a;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .parameter-item.small .parameter-value {
+            font-weight: 500;
+        }
+
+        .parameters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .custom-params {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .parameters-grid,
+            .custom-params {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .files-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .file-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .file-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        .file-preview {
+            width: 100%;
+            height: 200px;
+            background: #f3f3f3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .file-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .file-preview video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .file-icon {
+            font-size: 64px;
+            opacity: 0.3;
+        }
+
+        .file-info {
+            padding: 16px;
+        }
+
+        .file-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+            word-break: break-word;
+        }
+
+        .file-meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .file-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-text {
+            background: #f3f3f3;
+            color: #6e6e6e;
+        }
+
+        .badge-image {
+            background: #e8f3ff;
+            color: #0067c0;
+        }
+
+        .badge-video {
+            background: #fff4ce;
+            color: #9a7800;
+        }
+
+        .category-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .category-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .category-count {
+            background: #0067c0;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 32px;
+            color: #6e6e6e;
+            font-size: 13px;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 12px;
+            }
+
+            .header {
+                padding: 32px 24px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .stats {
+                gap: 12px;
+            }
+
+            .stat-card {
+                padding: 16px 12px;
+            }
+
+            .stat-value {
+                font-size: 24px;
+            }
+
+            .stat-label {
+                font-size: 12px;
+            }
+
+            .section {
+                padding: 20px;
+            }
+
+            .files-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f3f3f3;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>{{ title }}</h1>
+            <div class="meta">
+                <div class="meta-item">
+                    <span class="meta-icon">📅</span>
+                    <span>{{ datetime }}</span>
+                </div>
+                {% if app_id %}
+                <div class="meta-item">
+                    <span class="meta-icon">🆔</span>
+                    <span>{{ app_id }}</span>
+                </div>
+                {% endif %}
+                <div class="meta-item">
+                    <span class="meta-icon">🤖</span>
+                    <span>AI生成内容记录</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计信息 -->
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value">{{ material_count }}</div>
+                <div class="stat-label">素材文件</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ result_count }}</div>
+                <div class="stat-label">生成结果</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ material_count + result_count }}</div>
+                <div class="stat-label">总文件数</div>
+            </div>
+        </div>
+
+        <!-- 参数信息 -->
+        <div class="section">
+            <div class="section-title">
+                <span class="section-icon">⚙️</span>
+                参数信息
+            </div>
+
+            {% if parameters %}
+            <div class="parameters-container">
+                {% if parameters.prompt %}
+                <div class="parameter-item parameter-prompt">
+                    <div class="parameter-label">提示词</div>
+                    <div class="parameter-value">{{ parameters.prompt }}</div>
+                </div>
+                {% endif %}
+
+                {% if parameters.get('negative_prompt') %}
+                <div class="parameter-item">
+                    <div class="parameter-label">负向提示词</div>
+                    <div class="parameter-value">{{ parameters.negative_prompt }}</div>
+                </div>
+                {% endif %}
+
+                <div class="parameters-grid">
+                    {% if parameters.get('resolution') %}
+                    <div class="parameter-item small">
+                        <div class="parameter-label">分辨率</div>
+                        <div class="parameter-value">{{ parameters.resolution }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if parameters.get('seed') %}
+                    <div class="parameter-item small">
+                        <div class="parameter-label">随机种子</div>
+                        <div class="parameter-value">{{ parameters.seed }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if parameters.get('steps') %}
+                    <div class="parameter-item small">
+                        <div class="parameter-label">采样步数</div>
+                        <div class="parameter-value">{{ parameters.steps }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if parameters.get('cfg_scale') %}
+                    <div class="parameter-item small">
+                        <div class="parameter-label">CFG Scale</div>
+                        <div class="parameter-value">{{ parameters.cfg_scale }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if parameters.get('sampler') %}
+                    <div class="parameter-item small">
+                        <div class="parameter-label">采样器</div>
+                        <div class="parameter-value">{{ parameters.sampler }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if parameters.get('model') %}
+                    <div class="parameter-item small">
+                        <div class="parameter-label">模型</div>
+                        <div class="parameter-value">{{ parameters.model }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if parameters.get('custom_params') and parameters.custom_params %}
+                <div class="custom-params">
+                    {% for key, value in parameters.custom_params.items() %}
+                    <div class="parameter-item small">
+                        <div class="parameter-label">{{ key }}</div>
+                        <div class="parameter-value">{{ value }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="prompt-box">{{ prompt }}</div>
+            {% endif %}
+        </div>
+
+        <!-- 素材文件 -->
+        {% if materials %}
+        <div class="section">
+            <div class="category-header">
+                <div class="category-title">📁 素材文件</div>
+                <div class="category-count">{{ material_count }} 个文件</div>
+            </div>
+            <div class="files-grid">
+                {% for file in materials %}
+                <div class="file-card">
+                    <div class="file-preview">
+                        {% if file.category == 'image' %}
+                            <img src="/uploads/{{ file.filename }}"
+                                 alt="{{ file.filename }}"
+                                 onerror="this.parentElement.innerHTML='<span class=\\'file-icon\\'>🖼️</span>'">
+                        {% elif file.category == 'video' %}
+                            <video controls preload="metadata">
+                                <source src="/uploads/{{ file.filename }}" type="{{ file.mime_type }}">
+                                您的浏览器不支持视频播放
+                            </video>
+                        {% elif file.category == 'text' %}
+                            <span class="file-icon">📄</span>
+                        {% else %}
+                            <span class="file-icon">📁</span>
+                        {% endif %}
+                    </div>
+                    <div class="file-info">
+                        <div class="file-name">{{ file.filename }}</div>
+                        <div class="file-meta">
+                            <span class="file-badge badge-{{ file.category }}">{{ file.category.upper() }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 生成结果 -->
+        {% if results %}
+        <div class="section">
+            <div class="category-header">
+                <div class="category-title">✨ 生成结果</div>
+                <div class="category-count">{{ result_count }} 个文件</div>
+            </div>
+            <div class="files-grid">
+                {% for file in results %}
+                <div class="file-card">
+                    <div class="file-preview">
+                        {% if file.category == 'image' %}
+                            <img src="/generated/{{ file.filename }}"
+                                 alt="{{ file.filename }}"
+                                 onerror="this.parentElement.innerHTML='<span class=\\'file-icon\\'>🖼️</span>'">
+                        {% elif file.category == 'video' %}
+                            <video controls preload="metadata">
+                                <source src="/generated/{{ file.filename }}" type="{{ file.mime_type }}">
+                                您的浏览器不支持视频播放
+                            </video>
+                        {% elif file.category == 'text' %}
+                            <span class="file-icon">📄</span>
+                        {% else %}
+                            <span class="file-icon">📁</span>
+                        {% endif %}
+                    </div>
+                    <div class="file-info">
+                        <div class="file-name">{{ file.filename }}</div>
+                        <div class="file-meta">
+                            <span class="file-badge badge-{{ file.category }}">{{ file.category.upper() }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 页脚 -->
+        <div class="footer">
+            <p>AI内容生成记录系统 | 生成时间: {{ datetime }}</p>
+        </div>
+    </div>
+</body>
+</html>

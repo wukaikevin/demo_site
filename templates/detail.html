@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>案例详情 - AI内容生成记录系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px 40px;
+        }
+
+        .content-header {
+            background: white;
+            border-radius: 8px;
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .content-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
+        }
+
+        .meta-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            font-size: 14px;
+            color: #6e6e6e;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #0067c0;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #6e6e6e;
+            font-weight: 500;
+        }
+
+        .parameters-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .parameter-item {
+            background: #f9f9f9;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            border-radius: 6px;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .parameter-item.parameter-prompt {
+            background: white;
+            border-left: 3px solid #0067c0;
+            padding: 16px 20px;
+        }
+
+        .parameter-item.small {
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .parameter-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #6e6e6e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .parameter-item.parameter-prompt .parameter-label {
+            font-size: 14px;
+            color: #0067c0;
+        }
+
+        .parameter-value {
+            font-size: 14px;
+            color: #1a1a1a;
+            line-height: 1.6;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        .parameter-item.small .parameter-value {
+            font-weight: 500;
+        }
+
+        .parameters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .custom-params {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .files-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .file-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .file-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        .file-preview {
+            width: 100%;
+            height: 200px;
+            background: #f3f3f3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .file-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .file-preview video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .file-icon {
+            font-size: 64px;
+            opacity: 0.3;
+        }
+
+        .file-info {
+            padding: 16px;
+        }
+
+        .file-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+            word-break: break-word;
+        }
+
+        .file-meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .category-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .category-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .category-count {
+            background: #0067c0;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 80px 40px;
+            color: #6e6e6e;
+            font-size: 18px;
+        }
+
+        .error {
+            text-align: center;
+            padding: 80px 40px;
+            color: #d13438;
+            font-size: 18px;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .container {
+                padding: 24px 20px;
+            }
+
+            .content-header {
+                padding: 24px;
+            }
+
+            .content-title {
+                font-size: 24px;
+            }
+
+            .stats {
+                gap: 12px;
+            }
+
+            .stat-card {
+                padding: 16px 12px;
+            }
+
+            .stat-value {
+                font-size: 24px;
+            }
+
+            .stat-label {
+                font-size: 12px;
+            }
+
+            .parameters-grid,
+            .custom-params {
+                grid-template-columns: 1fr;
+            }
+
+            .files-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>AI创作案例画廊</h1>
+            <div class="header-nav">
+                <a href="/" class="btn btn-secondary">← 返回首页</a>
+                <a href="/form" class="btn btn-primary">+ 提交新案例</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="app">
+        <div class="loading">加载中...</div>
+    </div>
+
+    <script>
+        const recordId = '{{ record_id }}';
+
+        async function loadRecord() {
+            try {
+                const response = await fetch(`/api/record/${recordId}`);
+                const result = await response.json();
+
+                if (!result.success) {
+                    document.getElementById('app').innerHTML = `
+                        <div class="error">
+                            <div>错误: ${result.error}</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const record = result.data;
+                renderRecord(record);
+            } catch (error) {
+                document.getElementById('app').innerHTML = `
+                    <div class="error">
+                        <div>加载失败: ${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderRecord(record) {
+            const materialCount = record.statistics?.material_count || 0;
+            const resultCount = record.statistics?.result_count || 0;
+
+            document.getElementById('app').innerHTML = `
+                <div class="container">
+                    <div class="content-header">
+                        <div class="content-title">${record.title}</div>
+                        <div class="meta-info">
+                            <div class="meta-item">
+                                <span>📅</span>
+                                <span>${record.datetime}</span>
+                            </div>
+                            ${record.app_id ? `
+                            <div class="meta-item">
+                                <span>🆔</span>
+                                <span>${record.app_id}</span>
+                            </div>
+                            ` : ''}
+                            <div class="meta-item">
+                                <span>🤖</span>
+                                <span>AI生成内容记录</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-value">${materialCount}</div>
+                            <div class="stat-label">素材文件</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${resultCount}</div>
+                            <div class="stat-label">生成结果</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${materialCount + resultCount}</div>
+                            <div class="stat-label">总文件数</div>
+                        </div>
+                    </div>
+
+                    ${renderParameters(record.parameters)}
+                    ${renderFiles('materials', record.files?.materials || [], '📁 素材文件')}
+                    ${renderFiles('results', record.files?.results || [], '✨ 生成结果')}
+                </div>
+            `;
+        }
+
+        function renderParameters(parameters) {
+            if (!parameters) return '';
+
+            let html = `
+                <div class="section">
+                    <div class="section-title">
+                        <span>⚙️</span>
+                        参数信息
+                    </div>
+                    <div class="parameters-container">
+            `;
+
+            if (parameters.prompt) {
+                html += `
+                    <div class="parameter-item parameter-prompt">
+                        <div class="parameter-label">提示词</div>
+                        <div class="parameter-value">${escapeHtml(parameters.prompt)}</div>
+                    </div>
+                `;
+            }
+
+            if (parameters.negative_prompt) {
+                html += `
+                    <div class="parameter-item">
+                        <div class="parameter-label">负向提示词</div>
+                        <div class="parameter-value">${escapeHtml(parameters.negative_prompt)}</div>
+                    </div>
+                `;
+            }
+
+            const standardParams = ['resolution', 'seed', 'steps', 'cfg_scale', 'sampler', 'model'];
+            const paramLabels = {
+                resolution: '分辨率',
+                seed: '随机种子',
+                steps: '采样步数',
+                cfg_scale: 'CFG Scale',
+                sampler: '采样器',
+                model: '模型'
+            };
+
+            html += '<div class="parameters-grid">';
+            standardParams.forEach(param => {
+                if (parameters[param]) {
+                    html += `
+                        <div class="parameter-item small">
+                            <div class="parameter-label">${paramLabels[param]}</div>
+                            <div class="parameter-value">${parameters[param]}</div>
+                        </div>
+                    `;
+                }
+            });
+            html += '</div>';
+
+            if (parameters.custom_params && Object.keys(parameters.custom_params).length > 0) {
+                html += '<div class="custom-params">';
+                for (const [key, value] of Object.entries(parameters.custom_params)) {
+                    html += `
+                        <div class="parameter-item small">
+                            <div class="parameter-label">${key}</div>
+                            <div class="parameter-value">${value}</div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+
+            html += '</div></div>';
+            return html;
+        }
+
+        function renderFiles(type, files, title) {
+            if (!files || files.length === 0) return '';
+
+            const count = files.length;
+            let html = `
+                <div class="section">
+                    <div class="category-header">
+                        <div class="category-title">${title}</div>
+                        <div class="category-count">${count} 个文件</div>
+                    </div>
+                    <div class="files-grid">
+            `;
+
+            files.forEach(file => {
+                const fileUrl = type === 'materials' ? `/uploads/${file.filename}` : `/generated/${file.filename}`;
+                const mimeType = file.mime_type || 'application/octet-stream';
+
+                html += `
+                    <div class="file-card">
+                        <div class="file-preview">
+                            ${renderFilePreview(file, fileUrl, type)}
+                        </div>
+                        <div class="file-info">
+                            <div class="file-name">${file.filename}</div>
+                            <div class="file-meta">
+                                <span class="badge badge-${file.category}">${file.category.toUpperCase()}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div></div>';
+            return html;
+        }
+
+        function renderFilePreview(file, fileUrl, type) {
+            if (file.category === 'image') {
+                return `<img src="${fileUrl}" alt="${file.filename}" onerror="this.parentElement.innerHTML='<span class=\\'file-icon\\'>🖼️</span>'">`;
+            } else if (file.category === 'video') {
+                return `
+                    <video controls preload="metadata">
+                        <source src="${fileUrl}" type="${file.mime_type}">
+                        您的浏览器不支持视频播放
+                    </video>
+                `;
+            } else if (file.category === 'text') {
+                const preview = file.preview?.text || '';
+                return `<div style="padding: 20px; font-size: 13px; color: #6e6e6e; text-align: center;">${escapeHtml(preview.substring(0, 100))}${preview.length > 100 ? '...' : ''}</div>`;
+            } else {
+                return '<span class="file-icon">📁</span>';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 加载数据
+        loadRecord();
+    </script>
+</body>
+</html>

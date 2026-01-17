@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI创作案例画廊</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            min-height: 100vh;
+        }
+
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .filter-section {
+            background: white;
+            padding: 20px 40px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .filter-content {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .filter-label {
+            font-size: 13px;
+            color: #6e6e6e;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .app-filters {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-chip {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #f3f3f3;
+            color: #1a1a1a;
+            border: 1px solid transparent;
+        }
+
+        .filter-chip:hover {
+            background: #e8e8e8;
+        }
+
+        .filter-chip.active {
+            background: #0067c0;
+            color: white;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px 40px;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .card-cover {
+            width: 100%;
+            height: 200px;
+            background: #f3f3f3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .card-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .card-cover-placeholder {
+            font-size: 48px;
+            opacity: 0.3;
+        }
+
+        .card-body {
+            padding: 16px;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .card-meta {
+            display: flex;
+            gap: 12px;
+            font-size: 13px;
+            color: #6e6e6e;
+            flex-wrap: wrap;
+        }
+
+        .card-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .text-preview {
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            font-size: 13px;
+            color: #6e6e6e;
+            line-height: 1.6;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: #f9f9f9;
+        }
+
+        .video-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            backdrop-filter: blur(10px);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6e6e6e;
+            font-size: 14px;
+        }
+
+        .no-more {
+            text-align: center;
+            padding: 40px;
+            color: #6e6e6e;
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 80px 40px;
+            color: #6e6e6e;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state-text {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        .empty-state-hint {
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .filter-section {
+                padding: 16px 20px;
+            }
+
+            .container {
+                padding: 24px 20px;
+            }
+
+            .gallery-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>AI创作案例画廊</h1>
+            <div class="header-nav">
+                <a href="/form" class="btn btn-primary">+ 提交新案例</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="filter-section">
+        <div class="filter-content">
+            <div class="filter-label">按应用筛选</div>
+            <div class="app-filters" id="appFilters">
+                <div class="filter-chip active" data-app-id="">全部</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="gallery-grid" id="gallery"></div>
+        <div class="loading" id="loading" style="display: none;">加载中...</div>
+        <div class="no-more" id="noMore" style="display: none;">没有更多案例了</div>
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-state-icon">📭</div>
+            <div class="empty-state-text">暂无案例</div>
+            <div class="empty-state-hint">点击上方按钮提交第一个案例吧</div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let currentAppId = '';
+        let isLoading = false;
+        let hasMore = true;
+        const perPage = 12;
+
+        // 加载app_id列表
+        async function loadApps() {
+            try {
+                const response = await fetch('/api/apps');
+                const result = await response.json();
+                if (result.success && result.data.length > 0) {
+                    const container = document.getElementById('appFilters');
+                    result.data.forEach(appId => {
+                        const chip = document.createElement('div');
+                        chip.className = 'filter-chip';
+                        chip.dataset.appId = appId;
+                        chip.textContent = appId;
+                        chip.onclick = () => filterByApp(appId);
+                        container.appendChild(chip);
+                    });
+                }
+            } catch (error) {
+                console.error('加载应用列表失败:', error);
+            }
+        }
+
+        // 按app_id筛选
+        function filterByApp(appId) {
+            currentAppId = appId;
+            currentPage = 1;
+            hasMore = true;
+
+            // 更新筛选按钮状态
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.appId === appId);
+            });
+
+            // 清空并重新加载
+            document.getElementById('gallery').innerHTML = '';
+            loadRecords();
+        }
+
+        // 加载记录列表
+        async function loadRecords() {
+            if (isLoading || !hasMore) return;
+
+            isLoading = true;
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('noMore').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'none';
+
+            try {
+                const params = new URLSearchParams({
+                    page: currentPage,
+                    per_page: perPage
+                });
+
+                if (currentAppId) {
+                    params.append('app_id', currentAppId);
+                }
+
+                const response = await fetch(`/api/records?${params}`);
+                const result = await response.json();
+
+                console.log('API Response:', result);
+
+                if (result.success) {
+                    const records = result.data;
+
+                    console.log('Records loaded:', records.length, 'records');
+
+                    if (records.length === 0 && currentPage === 1) {
+                        document.getElementById('emptyState').style.display = 'block';
+                    } else {
+                        renderRecords(records);
+                        hasMore = records.length === perPage;
+                        if (!hasMore) {
+                            document.getElementById('noMore').style.display = 'block';
+                        }
+                    }
+                } else {
+                    console.error('API returned error:', result);
+                }
+            } catch (error) {
+                console.error('加载失败:', error);
+            } finally {
+                isLoading = false;
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // 渲染记录卡片
+        function renderRecords(records) {
+            const gallery = document.getElementById('gallery');
+
+            records.forEach(record => {
+                const card = document.createElement('a');
+                card.className = 'card';
+                card.href = `/record/${record.id}`;
+
+                // 生成封面HTML
+                let coverHtml = '';
+
+                console.log('Processing record:', record.title, 'preview:', record.preview);
+
+                if (record.preview && record.preview.data) {
+                    const previewType = record.preview.type;
+                    const previewData = record.preview.data;
+
+                    console.log('Preview type:', previewType, 'data:', previewData);
+
+                    if (previewType === 'image' && previewData.url) {
+                        // 图像预览
+                        coverHtml = `<img src="${previewData.url}" alt="${record.title}" onerror="this.parentElement.innerHTML='<div class=\\'card-cover-placeholder\\'>🖼️</div>'">`;
+                    } else if (previewType === 'video' && previewData.thumbnail) {
+                        // 视频缩略图预览
+                        coverHtml = `<img src="${previewData.thumbnail}" alt="${record.title}" onerror="this.parentElement.innerHTML='<div class=\\'card-cover-placeholder\\'>🎥</div>'"><div class="video-indicator">▶</div>`;
+                    } else if (previewType === 'text' && previewData.text) {
+                        // 文本预览
+                        coverHtml = `<div class="text-preview">${previewData.text}</div>`;
+                    } else {
+                        console.log('Using fallback placeholder for type:', previewType);
+                        coverHtml = '<div class="card-cover-placeholder">📄</div>';
+                    }
+                } else {
+                    console.log('No preview data, checking cover...');
+                    if (record.cover) {
+                        // 使用旧格式的封面
+                        coverHtml = `<img src="${record.cover}" alt="${record.title}" onerror="this.parentElement.innerHTML='<div class=\\'card-cover-placeholder\\'>🖼️</div>'">`;
+                    } else {
+                        coverHtml = '<div class="card-cover-placeholder">📄</div>';
+                    }
+                }
+
+                const appBadge = record.app_id ? `<span class="app-badge">${record.app_id}</span>` : '';
+
+                card.innerHTML = `
+                    <div class="card-cover">
+                        ${coverHtml}
+                    </div>
+                    <div class="card-body">
+                        <div class="card-title">${record.title}</div>
+                        <div class="card-meta">
+                            ${appBadge}
+                            <div class="card-meta-item">
+                                <span>📅</span>
+                                <span>${record.datetime}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                gallery.appendChild(card);
+            });
+        }
+
+        // 无限滚动
+        function handleScroll() {
+            const scrollTop = window.scrollY;
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+
+            if (scrollTop + windowHeight >= documentHeight - 200) {
+                currentPage++;
+                loadRecords();
+            }
+        }
+
+        // 初始化
+        window.addEventListener('scroll', handleScroll);
+        loadApps();
+        loadRecords();
+    </script>
+</body>
+</html>
