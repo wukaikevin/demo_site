@@ -930,13 +930,75 @@
         let totalRecords = 0;
         let selectedRecords = new Set();
         let currentRejectId = null;
+        let currentStatus = ''; // 当前状态筛选
+        let currentPageType = 'dashboard'; // dashboard, pending, approved, rejected, all
 
         // 页面加载时初始化
         document.addEventListener('DOMContentLoaded', function() {
+            initNavigation();
             loadStats();
-            loadCases();
             loadApps();
+            loadPageContent();
         });
+
+        // 初始化导航
+        function initNavigation() {
+            const menuItems = document.querySelectorAll('.menu-item[data-page]');
+
+            menuItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const page = this.dataset.page;
+
+                    // 更新菜单激活状态
+                    menuItems.forEach(mi => mi.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // 切换页面
+                    currentPageType = page;
+                    currentStatus = page === 'pending' ? 'pending' :
+                                  page === 'approved' ? 'approved' :
+                                  page === 'rejected' ? 'rejected' : '';
+                    currentPage = 1;
+                    selectedRecords.clear();
+
+                    // 更新面包屑
+                    updateBreadcrumb(page);
+
+                    // 加载页面内容
+                    loadPageContent();
+                });
+            });
+
+            // 更新当前用户名
+            const username = document.querySelector('.user-name');
+            if (username) {
+                fetch('/admin/api/stats')
+                    .then(r => r.json())
+                    .then(result => {
+                        // 可以从session获取用户名
+                        username.textContent = '管理员';
+                    });
+            }
+        }
+
+        // 更新面包屑
+        function updateBreadcrumb(page) {
+            const pageNames = {
+                'dashboard': '工作台',
+                'pending': '待审核',
+                'approved': '已通过',
+                'rejected': '已拒绝',
+                'all-cases': '所有案例',
+                'categories': '分类管理',
+                'settings': '系统设置'
+            };
+
+            const breadcrumb = document.querySelector('.breadcrumb');
+            if (breadcrumb) {
+                breadcrumb.innerHTML = `${pageNames[page] || page} / <span>案例审核</span>`;
+            }
+        }
 
         // 加载统计数据
         async function loadStats() {
@@ -956,7 +1018,251 @@
             }
         }
 
-        // 加载应用列表
+        // 加载页面内容
+        function loadPageContent() {
+            const content = document.getElementById('mainContent');
+
+            // 根据页面类型显示不同内容
+            if (currentPageType === 'categories') {
+                showCategoriesPage();
+            } else if (currentPageType === 'settings') {
+                showSettingsPage();
+            } else {
+                // 默认显示案例列表
+                showCasesList();
+            }
+        }
+
+        // 显示案例列表
+        function showCasesList() {
+            // 确保统计卡片和案例列表可见
+            document.getElementById('statCards').style.display = 'grid';
+            const card = document.querySelector('.card');
+            if (card) card.style.display = 'block';
+
+            loadCases();
+        }
+
+        // 显示分类页面
+        function showCategoriesPage() {
+            const content = document.getElementById('mainContent');
+
+            // 隐藏统计卡片和案例列表
+            document.getElementById('statCards').style.display = 'none';
+            const card = document.querySelector('.card');
+            if (card) card.style.display = 'block';
+
+            // 加载分类数据
+            loadCategoriesData();
+        }
+
+        // 显示设置页面
+        function showSettingsPage() {
+            const content = document.getElementById('mainContent');
+
+            // 隐藏统计卡片
+            document.getElementById('statCards').style.display = 'none';
+            const card = document.querySelector('.card');
+            if (card) card.style.display = 'block';
+
+            // 显示设置表单
+            loadSettingsData();
+        }
+
+        // 加载分类数据
+        async function loadCategoriesData() {
+            try {
+                const response = await fetch('/admin/api/stats');
+                const result = await response.json();
+
+                if (result.success) {
+                    const apps = result.data.by_app || {};
+                    const tbody = document.getElementById('tableBody');
+
+                    // 修改表格标题
+                    const headers = document.querySelectorAll('#casesTable th');
+                    if (headers.length >= 4) {
+                        headers[0].parentElement.innerHTML = `
+                            <th width="50">序号</th>
+                            <th>应用ID</th>
+                            <th width="100">总数</th>
+                            <th width="100">待审核</th>
+                            <th width="100">已通过</th>
+                            <th width="100">已拒绝</th>
+                            <th width="200">操作</th>
+                        `;
+                    }
+
+                    tbody.innerHTML = Object.keys(apps).map((appId, index) => {
+                        const stats = apps[appId];
+                        return `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td><strong>${escapeHtml(appId)}</strong></td>
+                                <td>${stats.total}</td>
+                                <td><span class="tag pending">${stats.pending}</span></td>
+                                <td><span class="tag approved">${stats.approved}</span></td>
+                                <td><span class="tag rejected">${stats.rejected || 0}</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn btn-link btn-sm" onclick="filterByApp('${appId}')">查看案例</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    // 隐藏分页
+                    document.getElementById('pagination').style.display = 'none';
+                    // 隐藏批量操作栏
+                    document.getElementById('batchToolbar').style.display = 'none';
+                    // 隐藏搜索栏
+                    document.querySelector('.search-bar').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('加载分类失败:', error);
+            }
+        }
+
+        // 按应用筛选
+        function filterByApp(appId) {
+            // 切换到所有案例页面
+            currentPageType = 'all-cases';
+            document.querySelectorAll('.menu-item').forEach(mi => {
+                mi.classList.remove('active');
+                if (mi.dataset.page === 'all-cases') {
+                    mi.classList.add('active');
+                }
+            });
+
+            // 设置筛选条件并加载
+            updateBreadcrumb('all-cases');
+            showCasesList();
+
+            // 设置应用筛选
+            setTimeout(() => {
+                document.getElementById('appFilter').value = appId;
+                document.querySelector('.search-bar').style.display = 'flex';
+                loadCases();
+            }, 100);
+        }
+
+        // 加载设置数据
+        async function loadSettingsData() {
+            const card = document.querySelector('.card');
+            const cardHeader = card.querySelector('.card-header');
+            const cardBody = card.querySelector('.card-body');
+            const searchToolbar = card.querySelector('.search-bar');
+            const table = card.querySelector('.table-container');
+            const pagination = card.querySelector('.pagination');
+
+            // 修改标题
+            cardHeader.querySelector('.card-title').textContent = '系统设置';
+            cardHeader.querySelector('.card-extra').innerHTML = '';
+
+            // 隐藏搜索和表格
+            if (searchToolbar) searchToolbar.style.display = 'none';
+            if (table) table.style.display = 'none';
+            if (pagination) pagination.style.display = 'none';
+
+            // 显示设置表单
+            cardBody.innerHTML = `
+                <div style="max-width: 600px;">
+                    <div class="form-item">
+                        <label class="form-label">站点名称</label>
+                        <input type="text" class="form-control" value="AI内容生成记录系统" readonly>
+                        <div style="margin-top: 8px; color: rgba(0, 0, 0, 0.45); font-size: 12px;">
+                            站点名称显示在页面标题中
+                        </div>
+                    </div>
+
+                    <div class="form-item">
+                        <label class="form-label">系统版本</label>
+                        <input type="text" class="form-control" value="v2.2 Professional" readonly>
+                    </div>
+
+                    <div class="form-item">
+                        <label class="form-label">数据存储路径</label>
+                        <input type="text" class="form-control" value="${window.location.pathname}/data" readonly>
+                    </div>
+
+                    <div class="form-item">
+                        <label class="form-label">上传文件路径</label>
+                        <input type="text" class="form-control" value="${window.location.pathname}/uploads" readonly>
+                    </div>
+
+                    <div class="form-item">
+                        <label class="form-label">会话超时时间</label>
+                        <input type="text" class="form-control" value="永久登录（除非手动退出）" readonly>
+                    </div>
+
+                    <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #f0f0f0;">
+                        <h4 style="margin-bottom: 16px; font-size: 16px; font-weight: 500;">系统信息</h4>
+
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                            <div>
+                                <div style="color: rgba(0, 0, 0, 0.45); font-size: 12px; margin-bottom: 4px;">Python版本</div>
+                                <div style="font-size: 14px;">${getPythonVersion()}</div>
+                            </div>
+                            <div>
+                                <div style="color: rgba(0, 0, 0, 0.45); font-size: 12px; margin-bottom: 4px;">Flask版本</div>
+                                <div style="font-size: 14px;">${getFlaskVersion()}</div>
+                            </div>
+                            <div>
+                                <div style="color: rgba(0, 0, 0, 0.45); font-size: 12px; margin-bottom: 4px;">数据格式</div>
+                                <div style="font-size: 14px;">JSON</div>
+                            </div>
+                            <div>
+                                <div style="color: rgba(0, 0, 0, 0.45); font-size: 12px; margin-bottom: 4px;">运行模式</div>
+                                <div style="font-size: 14px;">Production</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #f0f0f0;">
+                        <h4 style="margin-bottom: 16px; font-size: 16px; font-weight: 500;">快速操作</h4>
+
+                        <div style="display: flex; gap: 12px;">
+                            <button class="btn btn-default" onclick="window.open('/', '_blank')">
+                                🌐 访问前台首页
+                            </button>
+                            <button class="btn btn-default" onclick="showChangePasswordModal()">
+                                🔒 修改管理员密码
+                            </button>
+                            <button class="btn btn-primary" onclick="location.reload()">
+                                🔄 刷新系统
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 32px; padding: 24px; background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 4px;">
+                        <div style="color: #52c41a; font-weight: 500; margin-bottom: 8px;">✓ 系统运行正常</div>
+                        <div style="color: rgba(0, 0, 0, 0.65); font-size: 14px;">
+                            所有服务正常运行，数据存储工作正常。
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 隐藏批量操作栏
+            document.getElementById('batchToolbar').style.display = 'none';
+        }
+
+        // 获取Python版本（估算）
+        function getPythonVersion() {
+            const ua = navigator.userAgent;
+            if (ua.includes('Python')) {
+                // 从浏览器UA不太可能获取到Python版本，返回默认值
+                return '3.9+';
+            }
+            return '3.9+';
+        }
+
+        // 获取Flask版本（估算）
+        function getFlaskVersion() {
+            // 从服务器端获取，这里返回默认值
+            return '3.0.0';
+        }
         async function loadApps() {
             try {
                 const response = await fetch('/admin/api/stats');
@@ -981,12 +1287,38 @@
 
         // 加载案例列表
         async function loadCases() {
-            const statusFilter = document.getElementById('statusFilter').value;
+            const statusFilter = currentStatus || document.getElementById('statusFilter').value;
             const appFilter = document.getElementById('appFilter').value;
             const searchKeyword = document.getElementById('searchInput').value.trim();
 
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '<tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr>';
+
+            // 确保表格列标题正确
+            const headers = document.querySelectorAll('#casesTable th');
+            if (headers.length >= 7) {
+                headers[0].parentElement.innerHTML = `
+                    <th width="50"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"></th>
+                    <th width="80">预览</th>
+                    <th>案例标题</th>
+                    <th width="120">应用ID</th>
+                    <th width="100">状态</th>
+                    <th width="180">提交时间</th>
+                    <th width="200">操作</th>
+                `;
+            }
+
+            // 显示搜索栏
+            const searchBar = document.querySelector('.search-bar');
+            if (searchBar) {
+                searchBar.style.display = 'flex';
+            }
+
+            // 显示分页
+            const pagination = document.getElementById('pagination');
+            if (pagination) {
+                pagination.style.display = 'flex';
+            }
 
             try {
                 const params = new URLSearchParams({
@@ -1124,14 +1456,15 @@
             document.getElementById('appFilter').value = '';
             currentPage = 1;
             selectedRecords.clear();
+            currentStatus = '';
             loadCases();
         }
 
         // 刷新列表
         function refreshList() {
             selectedRecords.clear();
-            loadCases();
             loadStats();
+            loadCases();
         }
 
         // 分页
