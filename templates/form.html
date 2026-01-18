@@ -381,21 +381,14 @@
                 if (result.success) {
                     alertDiv.innerHTML = `
                         <div class="alert alert-success">
-                            ✓ ${result.message}
+                            ✓ ${result.message}，正在跳转到详情页...
                         </div>
                     `;
 
-                    // 3秒后重置表单
+                    // 跳转到案例详情页
                     setTimeout(() => {
-                        this.reset();
-                        document.getElementById('materialsList').innerHTML = '';
-                        document.getElementById('resultsList').innerHTML = '';
-                        alertDiv.innerHTML = '';
-                        // 重置时间为当前时间
-                        const now = new Date();
-                        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-                        document.getElementById('datetime').value = now.toISOString().slice(0, 16);
-                    }, 3000);
+                        window.location.href = `/record/${result.data.id}`;
+                    }, 1000);
                 } else {
                     alertDiv.innerHTML = `
                         <div class="alert alert-error">
