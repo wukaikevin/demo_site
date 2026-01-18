@@ -554,7 +554,8 @@ def submit_record():
         return jsonify({
             'success': True,
             'message': '记录保存成功',
-            'data': record
+            'data': record,
+            'record_id': record['id']  # 明确返回record_id
         })
 
     except Exception as e:

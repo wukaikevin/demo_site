@@ -387,7 +387,8 @@
 
                     // 跳转到案例详情页
                     setTimeout(() => {
-                        window.location.href = `/record/${result.data.id}`;
+                        const recordId = result.record_id || result.data.id;
+                        window.location.href = `/record/${recordId}`;
                     }, 1000);
                 } else {
                     alertDiv.innerHTML = `
