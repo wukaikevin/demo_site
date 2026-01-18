@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>案例审核管理系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f0f2f5;
+            overflow: hidden;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 240px;
+            height: 100vh;
+            background: #001529;
+            color: rgba(255, 255, 255, 0.65);
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            transition: all 0.2s;
+        }
+
+        .sidebar-logo {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #002140;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-logo span {
+            color: #1890ff;
+            margin-left: 4px;
+        }
+
+        .sidebar-menu {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 0;
+        }
+
+        .menu-section {
+            margin-bottom: 16px;
+        }
+
+        .menu-section-title {
+            padding: 8px 24px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.45);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .menu-item {
+            padding: 12px 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: rgba(255, 255, 255, 0.65);
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .menu-item:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .menu-item.active {
+            background: #1890ff;
+            color: #fff;
+        }
+
+        .menu-item-icon {
+            font-size: 16px;
+        }
+
+        .sidebar-footer {
+            padding: 16px 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-footer .menu-item {
+            padding: 8px 0;
+            color: rgba(255, 255, 255, 0.45);
+        }
+
+        .sidebar-footer .menu-item:hover {
+            color: #fff;
+        }
+
+        /* 主内容区 */
+        .main-layout {
+            margin-left: 240px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* 顶部导航栏 */
+        .header {
+            height: 64px;
+            background: #fff;
+            box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            position: sticky;
+            top: 0;
+            z-index: 999;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .breadcrumb {
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.45);
+        }
+
+        .breadcrumb span {
+            color: rgba(0, 0, 0, 0.85);
+        }
+
+        .user-dropdown {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .user-dropdown:hover {
+            background: #f5f5f5;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .user-name {
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.85);
+        }
+
+        /* 内容区 */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        /* 卡片 */
+        .card {
+            background: #fff;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            margin-bottom: 24px;
+        }
+
+        .card-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: rgba(0, 0, 0, 0.85);
+        }
+
+        .card-extra {
+            display: flex;
+            gap: 8px;
+        }
+
+        .card-body {
+            padding: 24px;
+        }
+
+        /* 统计卡片 */
+        .stat-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #fff;
+            border-radius: 4px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .stat-icon.blue { background: #e6f7ff; color: #1890ff; }
+        .stat-icon.orange { background: #fff7e6; color: #fa8c16; }
+        .stat-icon.green { background: #f6ffed; color: #52c41a; }
+        .stat-icon.red { background: #fff1f0; color: #f5222d; }
+
+        .stat-info {
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.45);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 30px;
+            font-weight: 600;
+            color: rgba(0, 0, 0, 0.85);
+            line-height: 1;
+        }
+
+        /* 表格 */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #fafafa;
+            padding: 16px;
+            text-align: left;
+            font-weight: 500;
+            color: rgba(0, 0, 0, 0.85);
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.65);
+        }
+
+        tr:hover td {
+            background: #fafafa;
+        }
+
+        /* 标签 */
+        .tag {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 2px;
+            font-size: 12px;
+            line-height: 20px;
+            font-weight: 400;
+        }
+
+        .tag.pending {
+            background: #fff7e6;
+            color: #fa8c16;
+            border: 1px solid #ffd591;
+        }
+
+        .tag.approved {
+            background: #f6ffed;
+            color: #52c41a;
+            border: 1px solid #b7eb8f;
+        }
+
+        .tag.rejected {
+            background: #fff1f0;
+            color: #f5222d;
+            border: 1px solid #ffa39e;
+        }
+
+        /* 按钮 */
+        .btn {
+            display: inline-block;
+            padding: 6px 16px;
+            font-size: 14px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            text-decoration: none;
+            line-height: 1.5;
+        }
+
+        .btn-primary {
+            background: #1890ff;
+            color: #fff;
+            border-color: #1890ff;
+        }
+
+        .btn-primary:hover {
+            background: #40a9ff;
+            border-color: #40a9ff;
+        }
+
+        .btn-default {
+            background: #fff;
+            color: rgba(0, 0, 0, 0.65);
+            border-color: #d9d9d9;
+        }
+
+        .btn-default:hover {
+            color: #40a9ff;
+            border-color: #40a9ff;
+        }
+
+        .btn-danger {
+            background: #ff4d4f;
+            color: #fff;
+            border-color: #ff4d4f;
+        }
+
+        .btn-danger:hover {
+            background: #ff7875;
+            border-color: #ff7875;
+        }
+
+        .btn-success {
+            background: #52c41a;
+            color: #fff;
+            border-color: #52c41a;
+        }
+
+        .btn-success:hover {
+            background: #73d13d;
+            border-color: #73d13d;
+        }
+
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 12px;
+        }
+
+        .btn-link {
+            background: none;
+            border: none;
+            color: #1890ff;
+            padding: 0;
+        }
+
+        .btn-link:hover {
+            color: #40a9ff;
+        }
+
+        /* 搜索栏 */
+        .search-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 2px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #40a9ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .select-input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 2px;
+            font-size: 14px;
+            background: #fff;
+            cursor: pointer;
+        }
+
+        .select-input:focus {
+            outline: none;
+            border-color: #40a9ff;
+        }
+
+        /* 分页 */
+        .pagination {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            padding: 16px 0;
+        }
+
+        .pagination-info {
+            color: rgba(0, 0, 0, 0.45);
+            font-size: 14px;
+            margin-right: auto;
+        }
+
+        .pagination button {
+            padding: 6px 12px;
+            border: 1px solid #d9d9d9;
+            background: #fff;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.65);
+            transition: all 0.2s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            color: #1890ff;
+            border-color: #40a9ff;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination button.active {
+            background: #1890ff;
+            color: #fff;
+            border-color: #1890ff;
+        }
+
+        /* 加载状态 */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: rgba(0, 0, 0, 0.45);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(24, 144, 255, 0.2);
+            border-top-color: #1890ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 0;
+            color: rgba(0, 0, 0, 0.45);
+        }
+
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #fff;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            max-width: 520px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: rgba(0, 0, 0, 0.85);
+        }
+
+        .modal-close {
+            cursor: pointer;
+            font-size: 18px;
+            color: rgba(0, 0, 0, 0.45);
+            padding: 4px;
+        }
+
+        .modal-close:hover {
+            color: rgba(0, 0, 0, 0.85);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        /* 表单 */
+        .form-item {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.85);
+        }
+
+        .form-label.required::before {
+            content: '*';
+            color: #f5222d;
+            margin-right: 4px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 2px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #40a9ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        textarea.form-control {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        /* 消息提示 */
+        .message {
+            padding: 12px 16px;
+            border-radius: 2px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        .message-success {
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            color: #52c41a;
+        }
+
+        .message-error {
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #ff4d4f;
+        }
+
+        .message-warning {
+            background: #fffbe6;
+            border: 1px solid #ffe58f;
+            color: #faad14;
+        }
+
+        .message-info {
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            color: #1890ff;
+        }
+
+        /* 操作按钮组 */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* 图片预览 */
+        .preview-image {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 2px;
+            border: 1px solid #f0f0f0;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .main-layout {
+                margin-left: 0;
+            }
+
+            .stat-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .search-bar {
+                flex-direction: column;
+            }
+
+            .search-input {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+        <div class="sidebar-logo">
+            案例<span>管理系统</span>
+        </div>
+
+        <div class="sidebar-menu">
+            <div class="menu-section">
+                <div class="menu-section-title">审核管理</div>
+                <a href="/admin" class="menu-item active" data-page="dashboard">
+                    <span class="menu-item-icon">📊</span>
+                    <span>工作台</span>
+                </a>
+                <a href="#" class="menu-item" data-page="pending">
+                    <span class="menu-item-icon">⏳</span>
+                    <span>待审核</span>
+                </a>
+                <a href="#" class="menu-item" data-page="approved">
+                    <span class="menu-item-icon">✓</span>
+                    <span>已通过</span>
+                </a>
+                <a href="#" class="menu-item" data-page="rejected">
+                    <span class="menu-item-icon">✗</span>
+                    <span>已拒绝</span>
+                </a>
+            </div>
+
+            <div class="menu-section">
+                <div class="menu-section-title">数据管理</div>
+                <a href="#" class="menu-item" data-page="all-cases">
+                    <span class="menu-item-icon">📁</span>
+                    <span>所有案例</span>
+                </a>
+                <a href="#" class="menu-item" data-page="categories">
+                    <span class="menu-item-icon">🏷️</span>
+                    <span>分类管理</span>
+                </a>
+            </div>
+
+            <div class="menu-section">
+                <div class="menu-section-title">系统设置</div>
+                <a href="#" class="menu-item" data-page="settings">
+                    <span class="menu-item-icon">⚙️</span>
+                    <span>系统设置</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <a href="/" class="menu-item" target="_blank">
+                <span class="menu-item-icon">🌐</span>
+                <span>访问前台</span>
+            </a>
+            <a href="/admin/logout" class="menu-item">
+                <span class="menu-item-icon">🚪</span>
+                <span>退出登录</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-layout">
+        <!-- 顶部导航栏 -->
+        <div class="header">
+            <div class="header-left">
+                <div class="breadcrumb">工作台 / <span>案例审核</span></div>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-default btn-sm" onclick="showChangePasswordModal()">修改密码</button>
+                <div class="user-dropdown">
+                    <div class="user-avatar">A</div>
+                    <span class="user-name" id="currentUsername">Admin</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 内容区 -->
+        <div class="content" id="mainContent">
+            <!-- 统计卡片 -->
+            <div class="stat-cards" id="statCards">
+                <div class="stat-card">
+                    <div class="stat-icon blue">📊</div>
+                    <div class="stat-info">
+                        <div class="stat-label">总案例数</div>
+                        <div class="stat-value" id="totalCount">-</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange">⏳</div>
+                    <div class="stat-info">
+                        <div class="stat-label">待审核</div>
+                        <div class="stat-value" id="pendingCount">-</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">✓</div>
+                    <div class="stat-info">
+                        <div class="stat-label">已通过</div>
+                        <div class="stat-value" id="approvedCount">-</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red">✗</div>
+                    <div class="stat-info">
+                        <div class="stat-label">已拒绝</div>
+                        <div class="stat-value" id="rejectedCount">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 案例列表 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">案例列表</div>
+                    <div class="card-extra">
+                        <button class="btn btn-default btn-sm" onclick="refreshList()">刷新</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- 搜索栏 -->
+                    <div class="search-bar">
+                        <input type="text" class="search-input" id="searchInput" placeholder="搜索案例标题、应用ID...">
+                        <select class="select-input" id="statusFilter">
+                            <option value="">全部状态</option>
+                            <option value="pending">待审核</option>
+                            <option value="approved">已通过</option>
+                            <option value="rejected">已拒绝</option>
+                        </select>
+                        <select class="select-input" id="appFilter">
+                            <option value="">全部应用</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="searchCases()">搜索</button>
+                        <button class="btn btn-default" onclick="resetSearch()">重置</button>
+                    </div>
+
+                    <!-- 批量操作栏 -->
+                    <div id="batchToolbar" style="display: none; padding: 12px 0; border-bottom: 1px solid #f0f0f0; margin-bottom: 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span id="selectedInfo" style="font-size: 14px; color: rgba(0, 0, 0, 0.65);">已选择 0 项</span>
+                            <div class="action-buttons">
+                                <button class="btn btn-success btn-sm" onclick="batchApprove()" id="batchApproveBtn" disabled>批量通过</button>
+                                <button class="btn btn-danger btn-sm" onclick="batchReject()" id="batchRejectBtn" disabled>批量拒绝</button>
+                                <button class="btn btn-default btn-sm" onclick="clearSelection()">取消选择</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 表格 -->
+                    <div class="table-container">
+                        <table id="casesTable">
+                            <thead>
+                                <tr>
+                                    <th width="50"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"></th>
+                                    <th width="80">预览</th>
+                                    <th>案例标题</th>
+                                    <th width="120">应用ID</th>
+                                    <th width="100">状态</th>
+                                    <th width="180">提交时间</th>
+                                    <th width="200">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                                <tr>
+                                    <td colspan="7" class="loading">
+                                        <div class="spinner"></div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分页 -->
+                    <div class="pagination" id="pagination">
+                        <div class="pagination-info" id="paginationInfo">共 0 条</div>
+                        <button onclick="prevPage()" id="prevBtn" disabled>上一页</button>
+                        <span id="pageNumbers"></span>
+                        <button onclick="nextPage()" id="nextBtn" disabled>下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 拒绝原因弹窗 -->
+    <div id="rejectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">拒绝案例</div>
+                <div class="modal-close" onclick="closeRejectModal()">×</div>
+            </div>
+            <div class="modal-body">
+                <div class="form-item">
+                    <label class="form-label required">拒绝原因</label>
+                    <textarea class="form-control" id="rejectReason" rows="4" placeholder="请输入拒绝原因，将告知提交者..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeRejectModal()">取消</button>
+                <button class="btn btn-danger" onclick="confirmReject()">确认拒绝</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改密码弹窗 -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">修改密码</div>
+                <div class="modal-close" onclick="closePasswordModal()">×</div>
+            </div>
+            <div class="modal-body">
+                <div class="form-item">
+                    <label class="form-label required">原密码</label>
+                    <input type="password" class="form-control" id="oldPassword" placeholder="请输入当前密码">
+                </div>
+                <div class="form-item">
+                    <label class="form-label required">新密码</label>
+                    <input type="password" class="form-control" id="newPassword" placeholder="请输入新密码（至少6个字符）">
+                </div>
+                <div class="form-item">
+                    <label class="form-label required">确认新密码</label>
+                    <input type="password" class="form-control" id="confirmPassword" placeholder="请再次输入新密码">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closePasswordModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmChangePassword()">确认修改</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentPage = 1;
+        let pageSize = 20;
+        let totalRecords = 0;
+        let selectedRecords = new Set();
+        let currentRejectId = null;
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadCases();
+            loadApps();
+        });
+
+        // 加载统计数据
+        async function loadStats() {
+            try {
+                const response = await fetch('/admin/api/stats');
+                const result = await response.json();
+
+                if (result.success) {
+                    const stats = result.data;
+                    document.getElementById('totalCount').textContent = stats.total;
+                    document.getElementById('pendingCount').textContent = stats.pending;
+                    document.getElementById('approvedCount').textContent = stats.approved;
+                    document.getElementById('rejectedCount').textContent = stats.rejected;
+                }
+            } catch (error) {
+                console.error('加载统计失败:', error);
+            }
+        }
+
+        // 加载应用列表
+        async function loadApps() {
+            try {
+                const response = await fetch('/admin/api/stats');
+                const result = await response.json();
+
+                if (result.success) {
+                    const apps = result.data.by_app || {};
+                    const select = document.getElementById('appFilter');
+                    select.innerHTML = '<option value="">全部应用</option>';
+
+                    for (const appId in apps) {
+                        const option = document.createElement('option');
+                        option.value = appId;
+                        option.textContent = `${appId} (${apps[appId].total})`;
+                        select.appendChild(option);
+                    }
+                }
+            } catch (error) {
+                console.error('加载应用列表失败:', error);
+            }
+        }
+
+        // 加载案例列表
+        async function loadCases() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const appFilter = document.getElementById('appFilter').value;
+            const searchKeyword = document.getElementById('searchInput').value.trim();
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr>';
+
+            try {
+                const params = new URLSearchParams({
+                    page: currentPage,
+                    per_page: pageSize
+                });
+
+                if (statusFilter) params.append('status', statusFilter);
+                if (appFilter) params.append('app_id', appFilter);
+
+                const response = await fetch(`/admin/api/records?${params}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    displayCases(result.data);
+                    totalRecords = result.pagination.total;
+                    updatePagination();
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" class="loading">加载失败</td></tr>';
+                }
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="7" class="loading">加载失败: ' + error.message + '</td></tr>';
+            }
+        }
+
+        // 显示案例列表
+        function displayCases(cases) {
+            const tbody = document.getElementById('tableBody');
+
+            if (cases.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            <div class="empty-icon">📭</div>
+                            <div>暂无数据</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = cases.map(c => {
+                const status = c.status || 'pending';
+                const statusClass = status;
+                const statusText = {
+                    'pending': '待审核',
+                    'approved': '已通过',
+                    'rejected': '已拒绝'
+                }[status] || '待审核';
+
+                const preview = getPreviewImage(c);
+                const isSelected = selectedRecords.has(c.id);
+
+                return `
+                    <tr data-id="${c.id}">
+                        <td><input type="checkbox" class="row-checkbox" data-id="${c.id}" ${isSelected ? 'checked' : ''} onchange="toggleSelection('${c.id}', this.checked)"></td>
+                        <td>${preview}</td>
+                        <td><div style="font-weight: 500;">${escapeHtml(c.title || '未命名')}</div></td>
+                        <td>${escapeHtml(c.app_id || '-')}</td>
+                        <td><span class="tag ${statusClass}">${statusText}</span></td>
+                        <td style="color: rgba(0, 0, 0, 0.45);">${formatTime(c.generation_time)}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn btn-link btn-sm" onclick="viewCase('${c.id}')">查看</button>
+                                ${status === 'pending' ? `
+                                    <button class="btn btn-link btn-sm" onclick="approveCase('${c.id}')" style="color: #52c41a;">通过</button>
+                                    <button class="btn btn-link btn-sm" onclick="showRejectModal('${c.id}')" style="color: #f5222d;">拒绝</button>
+                                ` : ''}
+                                <button class="btn btn-link btn-sm" onclick="deleteCase('${c.id}')" style="color: #f5222d;">删除</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            updateBatchToolbar();
+        }
+
+        // 获取预览图片
+        function getPreviewImage(c) {
+            try {
+                const files = c.files || {};
+                const results = files.results || [];
+                const materials = files.materials || [];
+
+                for (const file of [...results, ...materials]) {
+                    if (file.category === 'image' && file.path) {
+                        return `<img src="${file.path}" class="preview-image" alt="预览">`;
+                    } else if (file.category === 'video' && file.preview && file.preview.thumbnail) {
+                        return `<img src="${file.preview.thumbnail}" class="preview-image" alt="预览">`;
+                    }
+                }
+            } catch (e) {
+                console.error('获取预览失败:', e);
+            }
+
+            return '<div style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: #fafafa; border-radius: 2px;">📄</div>';
+        }
+
+        // 格式化时间
+        function formatTime(timeStr) {
+            if (!timeStr) return '-';
+            try {
+                const date = new Date(timeStr);
+                return date.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch {
+                return timeStr;
+            }
+        }
+
+        // HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 搜索
+        function searchCases() {
+            currentPage = 1;
+            selectedRecords.clear();
+            loadCases();
+        }
+
+        // 重置搜索
+        function resetSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('appFilter').value = '';
+            currentPage = 1;
+            selectedRecords.clear();
+            loadCases();
+        }
+
+        // 刷新列表
+        function refreshList() {
+            selectedRecords.clear();
+            loadCases();
+            loadStats();
+        }
+
+        // 分页
+        function updatePagination() {
+            const totalPages = Math.ceil(totalRecords / pageSize);
+            const start = (currentPage - 1) * pageSize + 1;
+            const end = Math.min(currentPage * pageSize, totalRecords);
+
+            document.getElementById('paginationInfo').textContent = `共 ${totalRecords} 条，第 ${start}-${end} 条`;
+            document.getElementById('prevBtn').disabled = currentPage <= 1;
+            document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+        }
+
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                loadCases();
+            }
+        }
+
+        function nextPage() {
+            const totalPages = Math.ceil(totalRecords / pageSize);
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadCases();
+            }
+        }
+
+        // 选择操作
+        function toggleSelection(id, checked) {
+            if (checked) {
+                selectedRecords.add(id);
+            } else {
+                selectedRecords.delete(id);
+            }
+            updateBatchToolbar();
+            updateSelectAllCheckbox();
+        }
+
+        function toggleSelectAll() {
+            const checkbox = document.getElementById('selectAllCheckbox');
+            const checkboxes = document.querySelectorAll('.row-checkbox');
+
+            checkboxes.forEach(cb => {
+                cb.checked = checkbox.checked;
+                const id = cb.dataset.id;
+                if (checkbox.checked) {
+                    selectedRecords.add(id);
+                } else {
+                    selectedRecords.delete(id);
+                }
+            });
+
+            updateBatchToolbar();
+        }
+
+        function updateSelectAllCheckbox() {
+            const checkboxes = document.querySelectorAll('.row-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            document.getElementById('selectAllCheckbox').checked = allChecked && checkboxes.length > 0;
+        }
+
+        function clearSelection() {
+            selectedRecords.clear();
+            document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = false);
+            document.getElementById('selectAllCheckbox').checked = false;
+            updateBatchToolbar();
+        }
+
+        function updateBatchToolbar() {
+            const toolbar = document.getElementById('batchToolbar');
+            const count = selectedRecords.size;
+
+            if (count > 0) {
+                toolbar.style.display = 'block';
+                document.getElementById('selectedInfo').textContent = `已选择 ${count} 项`;
+                document.getElementById('batchApproveBtn').disabled = false;
+                document.getElementById('batchRejectBtn').disabled = false;
+            } else {
+                toolbar.style.display = 'none';
+            }
+        }
+
+        // 案例操作
+        async function viewCase(id) {
+            window.open(`/record/${id}`, '_blank');
+        }
+
+        async function approveCase(id) {
+            if (!confirm('确定要通过这个案例吗？')) return;
+
+            try {
+                const response = await fetch(`/admin/api/review/${id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'approve' })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('✓ ' + result.message);
+                    loadCases();
+                    loadStats();
+                } else {
+                    alert('✗ ' + result.error);
+                }
+            } catch (error) {
+                alert('✗ 操作失败: ' + error.message);
+            }
+        }
+
+        function showRejectModal(id) {
+            currentRejectId = id;
+            document.getElementById('rejectReason').value = '';
+            document.getElementById('rejectModal').classList.add('show');
+        }
+
+        function closeRejectModal() {
+            currentRejectId = null;
+            document.getElementById('rejectModal').classList.remove('show');
+        }
+
+        async function confirmReject() {
+            const reason = document.getElementById('rejectReason').value.trim();
+            if (!reason) {
+                alert('请输入拒绝原因');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/api/review/${currentRejectId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'reject',
+                        reason: reason
+                    })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('✓ ' + result.message);
+                    closeRejectModal();
+                    loadCases();
+                    loadStats();
+                } else {
+                    alert('✗ ' + result.error);
+                }
+            } catch (error) {
+                alert('✗ 操作失败: ' + error.message);
+            }
+        }
+
+        async function deleteCase(id) {
+            if (!confirm('⚠️ 确定要删除这个案例吗？此操作不可恢复！')) return;
+
+            try {
+                const response = await fetch(`/admin/api/record/${id}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('✓ 删除成功');
+                    loadCases();
+                    loadStats();
+                } else {
+                    alert('✗ ' + result.error);
+                }
+            } catch (error) {
+                alert('✗ 删除失败: ' + error.message);
+            }
+        }
+
+        // 批量操作
+        async function batchApprove() {
+            const ids = Array.from(selectedRecords);
+            if (ids.length === 0) return;
+
+            if (!confirm(`确定要批量通过这 ${ids.length} 个案例吗？`)) return;
+
+            await performBatchOperation('approve', ids, '批量通过');
+        }
+
+        async function batchReject() {
+            const ids = Array.from(selectedRecords);
+            if (ids.length === 0) return;
+
+            const reason = prompt(`请输入拒绝原因（将应用到所有 ${ids.length} 个案例）：`);
+            if (reason === null) return;
+
+            await performBatchOperation('reject', ids, '批量拒绝', { reason });
+        }
+
+        async function performBatchOperation(action, ids, actionName, options = {}) {
+            const data = {
+                action: action,
+                record_ids: ids
+            };
+
+            if (options.reason) {
+                data.reason = options.reason;
+            }
+
+            try {
+                const response = await fetch('/admin/api/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`✓ ${result.message}`);
+                    clearSelection();
+                    loadCases();
+                    loadStats();
+                } else {
+                    alert(`✗ ${result.error}`);
+                }
+            } catch (error) {
+                alert(`✗ ${actionName}失败: ${error.message}`);
+            }
+        }
+
+        // 修改密码
+        function showChangePasswordModal() {
+            document.getElementById('oldPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            document.getElementById('passwordModal').classList.add('show');
+        }
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').classList.remove('show');
+        }
+
+        async function confirmChangePassword() {
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!oldPassword || !newPassword || !confirmPassword) {
+                alert('请填写所有字段');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                alert('新密码至少需要6个字符');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                alert('两次输入的新密码不一致');
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        old_password: oldPassword,
+                        new_password: newPassword,
+                        confirm_password: confirmPassword
+                    })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('✓ ' + result.message);
+                    closePasswordModal();
+                } else {
+                    alert('✗ ' + result.error);
+                }
+            } catch (error) {
+                alert('✗ 修改失败: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

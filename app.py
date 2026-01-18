@@ -902,7 +902,13 @@ def admin_logout():
 @login_required
 def admin_dashboard():
     """管理员控制台"""
-    return render_template('admin_dashboard.html')
+    return render_template('admin_layout_new.html')
+
+@app.route('/admin')
+@login_required
+def admin_index():
+    """管理后台首页（重定向到dashboard）"""
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/api/records')
 @login_required
