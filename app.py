@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, jsonify, send_from_directory
+from flask import Flask, request, render_template, jsonify, send_from_directory, session, redirect, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
 import os
 import json
@@ -6,6 +6,8 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 import mimetypes
 import uuid
+import subprocess
+import functools
 
 try:
     import cv2
@@ -35,6 +37,7 @@ app.config['OUTPUT_FOLDER'] = 'output'
 app.config['DATA_FOLDER'] = 'data'
 app.config['THUMBNAIL_FOLDER'] = 'thumbnails'
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB max file size
+app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'  # 用于session加密
 
 # 确保必要的文件夹存在
 for folder in [app.config['UPLOAD_FOLDER'], app.config['GENERATED_FOLDER'],
@@ -55,6 +58,11 @@ ALLOWED_EXTENSIONS = {
     'image': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'],
     'video': ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv']
 }
+
+# 审核状态常量
+STATUS_PENDING = 'pending'  # 待审核
+STATUS_APPROVED = 'approved'  # 已审核通过
+STATUS_REJECTED = 'rejected'  # 已拒绝
 
 def get_file_category(filename):
     """判断文件类型分类"""
@@ -531,7 +539,9 @@ def submit_record():
                 'material_count': len(materials_list),
                 'result_count': len(results_list),
                 'total_size': total_size
-            }
+            },
+            'status': STATUS_PENDING,  # 新案例默认为待审核状态
+            'review_status': 'pending'  # 兼容字段
         }
         print(f"[DEBUG] Record object ID: {record['id']}")  # 调试日志
 
@@ -547,7 +557,8 @@ def submit_record():
             'app_id': record.get('app_id'),
             'generation_time': record['generation_time'],
             'has_preview': bool(main_preview),
-            'preview_type': main_preview['type'] if main_preview else None
+            'preview_type': main_preview['type'] if main_preview else None,
+            'status': STATUS_PENDING  # 索引中也保存状态
         }
 
         records = load_records()
@@ -597,6 +608,9 @@ def api_records():
 
         # 加载索引（轻量级）
         index_records = load_records()
+
+        # 只显示已审核通过的案例（公开API）
+        index_records = [r for r in index_records if r.get('status') == STATUS_APPROVED]
 
         # 按app_id过滤
         if app_id_filter:
@@ -658,12 +672,13 @@ def api_records():
 
 @app.route('/api/apps')
 def api_apps():
-    """API: 获取所有app_id列表"""
+    """API: 获取所有app_id列表（仅已审核通过的案例）"""
     try:
         records = load_records()
         app_ids = set()
         for record in records:
-            if record.get('app_id'):
+            # 只统计已审核通过的案例
+            if record.get('app_id') and record.get('status') == STATUS_APPROVED:
                 app_ids.add(record['app_id'])
         return jsonify({
             'success': True,
@@ -676,16 +691,25 @@ def api_apps():
 def api_record_detail(record_id):
     """API: 获取单个记录的完整详情"""
     try:
-        # 从索引中查找记录的app_id
+        # 从索引中查找记录的app_id和状态
         index_records = load_records()
         app_id = None
+        record_status = None
         for index_entry in index_records:
             if index_entry['id'] == record_id:
                 app_id = index_entry.get('app_id')
+                record_status = index_entry.get('status', STATUS_PENDING)
                 break
 
         if not app_id:
             return jsonify({'success': False, 'error': '记录不存在'}), 404
+
+        # 检查审核状态
+        if record_status != STATUS_APPROVED:
+            return jsonify({
+                'success': False,
+                'error': '该案例正在审核中，暂不可查看'
+            }), 403
 
         # 加载完整记录
         record = load_record(record_id, app_id)
@@ -701,6 +725,283 @@ def api_record_detail(record_id):
         return jsonify({
             'success': True,
             'data': record
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==================== 管理员认证和审核管理功能 ====================
+
+def verify_linux_password(username, password):
+    """验证Linux系统用户密码"""
+    try:
+        # 使用sudo进行非交互式验证
+        # 使用-S选项从stdin读取密码，-k禁用缓存凭据
+        echo = subprocess.Popen(['echo', password], stdout=subprocess.PIPE)
+        sudo = subprocess.Popen(
+            ['sudo', '-S', '-k', '-u', username, 'true'],
+            stdin=echo.stdout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        echo.stdout.close()
+        stdout, stderr = sudo.communicate()
+
+        if sudo.returncode == 0:
+            return True
+        else:
+            print(f"[Auth] 密码验证失败: {stderr.decode('utf-8', errors='ignore')}")
+            return False
+    except Exception as e:
+        print(f"[Auth] 验证过程出错: {str(e)}")
+        return False
+
+def login_required(f):
+    """管理员登录验证装饰器"""
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session or not session['logged_in']:
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    """管理员登录页面"""
+    if request.method == 'GET':
+        return render_template('admin_login.html')
+
+    # POST请求 - 处理登录
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+
+    if not username or not password:
+        return jsonify({'success': False, 'error': '用户名和密码不能为空'}), 400
+
+    # 验证是否为root用户
+    if username != 'root':
+        return jsonify({'success': False, 'error': '必须是root用户'}), 403
+
+    # 验证系统密码
+    if verify_linux_password(username, password):
+        session['logged_in'] = True
+        session['username'] = username
+        session.permanent = True  # 保持会话
+        return jsonify({
+            'success': True,
+            'message': '登录成功',
+            'redirect': '/admin/dashboard'
+        })
+    else:
+        return jsonify({'success': False, 'error': '用户名或密码错误'}), 401
+
+@app.route('/admin/logout')
+def admin_logout():
+    """管理员登出"""
+    session.clear()
+    return redirect(url_for('admin_login'))
+
+@app.route('/admin/dashboard')
+@login_required
+def admin_dashboard():
+    """管理员控制台"""
+    return render_template('admin_dashboard.html')
+
+@app.route('/admin/api/records')
+@login_required
+def admin_api_records():
+    """API: 获取所有案例列表（包括待审核的）"""
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+        status_filter = request.args.get('status', '')
+        app_id_filter = request.args.get('app_id', '')
+
+        # 加载索引
+        index_records = load_records()
+
+        # 按状态过滤
+        if status_filter:
+            index_records = [r for r in index_records if r.get('status') == status_filter]
+
+        # 按app_id过滤
+        if app_id_filter:
+            index_records = [r for r in index_records if r.get('app_id') == app_id_filter]
+
+        # 分页
+        total = len(index_records)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_index = index_records[start:end]
+
+        # 加载完整数据
+        result_records = []
+        for index_entry in paginated_index:
+            record_app_id = index_entry.get('app_id')
+            if record_app_id:
+                full_record = load_record(index_entry['id'], record_app_id)
+                if full_record:
+                    result_records.append(full_record)
+            else:
+                # 旧格式兼容
+                record = index_entry.copy()
+                result_records.append(record)
+
+        return jsonify({
+            'success': True,
+            'data': result_records,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'total_pages': (total + per_page - 1) // per_page
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/api/record/<record_id>', methods=['GET', 'DELETE'])
+@login_required
+def admin_api_record_detail(record_id):
+    """API: 获取或删除单个案例"""
+    try:
+        # 从索引中查找记录的app_id
+        index_records = load_records()
+        app_id = None
+        index_entry = None
+
+        for entry in index_records:
+            if entry['id'] == record_id:
+                app_id = entry.get('app_id')
+                index_entry = entry
+                break
+
+        if not app_id:
+            return jsonify({'success': False, 'error': '记录不存在'}), 404
+
+        if request.method == 'DELETE':
+            # 删除记录
+            # 1. 删除完整记录文件
+            app_dir = os.path.join(RECORDS_DIR, app_id)
+            record_file = os.path.join(app_dir, f"{record_id}.json")
+            if os.path.exists(record_file):
+                os.remove(record_file)
+
+            # 2. 从索引中移除
+            index_records.remove(index_entry)
+            save_records(index_records)
+
+            return jsonify({
+                'success': True,
+                'message': '删除成功'
+            })
+
+        # GET请求 - 返回完整记录
+        record = load_record(record_id, app_id)
+        if not record:
+            return jsonify({'success': False, 'error': '记录不存在'}), 404
+
+        return jsonify({
+            'success': True,
+            'data': record
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/api/review/<record_id>', methods=['POST'])
+@login_required
+def admin_api_review(record_id):
+    """API: 审核案例（通过/拒绝）"""
+    try:
+        data = request.get_json()
+        action = data.get('action')  # 'approve' 或 'reject'
+        reason = data.get('reason', '')  # 拒绝原因（可选）
+
+        if action not in ['approve', 'reject']:
+            return jsonify({'success': False, 'error': '无效的操作'}), 400
+
+        # 从索引中查找记录
+        index_records = load_records()
+        app_id = None
+        index_entry = None
+
+        for entry in index_records:
+            if entry['id'] == record_id:
+                app_id = entry.get('app_id')
+                index_entry = entry
+                break
+
+        if not app_id:
+            return jsonify({'success': False, 'error': '记录不存在'}), 404
+
+        # 加载完整记录
+        record = load_record(record_id, app_id)
+        if not record:
+            return jsonify({'success': False, 'error': '记录不存在'}), 404
+
+        # 更新状态
+        new_status = STATUS_APPROVED if action == 'approve' else STATUS_REJECTED
+        record['status'] = new_status
+        record['review_status'] = new_status  # 兼容字段
+
+        if action == 'reject' and reason:
+            record['reject_reason'] = reason
+
+        # 保存完整记录
+        save_record(record)
+
+        # 更新索引
+        index_entry['status'] = new_status
+        save_records(index_records)
+
+        return jsonify({
+            'success': True,
+            'message': f'案例已{"通过" if action == "approve" else "拒绝"}审核',
+            'data': {
+                'record_id': record_id,
+                'status': new_status
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/api/stats')
+@login_required
+def admin_api_stats():
+    """API: 获取统计信息"""
+    try:
+        index_records = load_records()
+
+        stats = {
+            'total': len(index_records),
+            'pending': 0,
+            'approved': 0,
+            'rejected': 0,
+            'by_app': {}
+        }
+
+        for record in index_records:
+            status = record.get('status', STATUS_PENDING)
+            if status == STATUS_PENDING:
+                stats['pending'] += 1
+            elif status == STATUS_APPROVED:
+                stats['approved'] += 1
+            elif status == STATUS_REJECTED:
+                stats['rejected'] += 1
+
+            # 按应用统计
+            app_id = record.get('app_id', 'unknown')
+            if app_id not in stats['by_app']:
+                stats['by_app'][app_id] = {'total': 0, 'pending': 0, 'approved': 0}
+            stats['by_app'][app_id]['total'] += 1
+            if status == STATUS_PENDING:
+                stats['by_app'][app_id]['pending'] += 1
+            elif status == STATUS_APPROVED:
+                stats['by_app'][app_id]['approved'] += 1
+
+        return jsonify({
+            'success': True,
+            'data': stats
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

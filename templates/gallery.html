@@ -126,6 +126,26 @@
             color: #1a1a1a;
             margin-bottom: 8px;
             overflow: hidden;
+        }
+
+        .card-status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .card-status-badge.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .card-status-badge.approved {
+            background: #d4edda;
+            color: #155724;
+        }
             text-overflow: ellipsis;
             white-space: nowrap;
         }
@@ -396,11 +416,18 @@
 
                 const appBadge = record.app_id ? `<span class="app-badge">${record.app_id}</span>` : '';
 
+                // 添加状态标识
+                const status = record.status || 'pending';
+                const statusBadge = status === 'pending'
+                    ? '<div class="card-status-badge pending">⏳ 待审核</div>'
+                    : '';
+
                 card.innerHTML = `
                     <div class="card-cover">
                         ${coverHtml}
                     </div>
                     <div class="card-body">
+                        ${statusBadge}
                         <div class="card-title">${record.title}</div>
                         <div class="card-meta">
                             ${appBadge}
