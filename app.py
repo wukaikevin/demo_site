@@ -783,8 +783,10 @@ def api_record_detail(record_id):
         if not app_id:
             return jsonify({'success': False, 'error': '记录不存在'}), 404
 
-        # 检查审核状态
-        if record_status != STATUS_APPROVED:
+        # 检查审核状态和用户权限
+        # 管理员可以查看所有状态的案例，普通用户只能查看已审核通过的
+        is_admin = session.get('logged_in', False)
+        if not is_admin and record_status != STATUS_APPROVED:
             return jsonify({
                 'success': False,
                 'error': '该案例正在审核中，暂不可查看'
@@ -1131,6 +1133,103 @@ def admin_change_password():
             })
         else:
             return jsonify({'success': False, 'error': '密码修改失败'}), 500
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/api/batch', methods=['POST'])
+@login_required
+def admin_batch_operation():
+    """API: 批量操作（审核、删除）"""
+    try:
+        data = request.get_json()
+        action = data.get('action')  # 'approve', 'reject', 'delete'
+        record_ids = data.get('record_ids', [])
+        reason = data.get('reason', '')  # 拒绝原因（可选）
+
+        if not action:
+            return jsonify({'success': False, 'error': '缺少操作类型'}), 400
+
+        if not record_ids or not isinstance(record_ids, list):
+            return jsonify({'success': False, 'error': '缺少记录ID列表'}), 400
+
+        if len(record_ids) == 0:
+            return jsonify({'success': False, 'error': '记录ID列表为空'}), 400
+
+        # 加载索引
+        index_records = load_records()
+
+        results = {
+            'success': True,
+            'total': len(record_ids),
+            'succeeded': 0,
+            'failed': 0,
+            'errors': []
+        }
+
+        # 执行批量操作
+        for record_id in record_ids:
+            try:
+                # 查找索引中的记录
+                index_entry = None
+                for entry in index_records:
+                    if entry['id'] == record_id:
+                        index_entry = entry
+                        break
+
+                if not index_entry:
+                    results['errors'].append(f"{record_id}: 记录不存在")
+                    results['failed'] += 1
+                    continue
+
+                app_id = index_entry.get('app_id')
+                if not app_id:
+                    results['errors'].append(f"{record_id}: 缺少app_id")
+                    results['failed'] += 1
+                    continue
+
+                if action == 'delete':
+                    # 删除操作
+                    app_dir = os.path.join(RECORDS_DIR, app_id)
+                    record_file = os.path.join(app_dir, f"{record_id}.json")
+                    if os.path.exists(record_file):
+                        os.remove(record_file)
+
+                    index_records.remove(index_entry)
+
+                elif action in ['approve', 'reject']:
+                    # 审核操作
+                    record = load_record(record_id, app_id)
+                    if not record:
+                        results['errors'].append(f"{record_id}: 无法加载记录")
+                        results['failed'] += 1
+                        continue
+
+                    new_status = STATUS_APPROVED if action == 'approve' else STATUS_REJECTED
+                    record['status'] = new_status
+                    record['review_status'] = new_status
+
+                    if action == 'reject' and reason:
+                        record['reject_reason'] = reason
+
+                    save_record(record)
+                    index_entry['status'] = new_status
+
+                results['succeeded'] += 1
+
+            except Exception as e:
+                results['errors'].append(f"{record_id}: {str(e)}")
+                results['failed'] += 1
+
+        # 保存索引（如果有删除或审核操作）
+        if action in ['delete', 'approve', 'reject']:
+            save_records(index_records)
+
+        return jsonify({
+            'success': True,
+            'message': f'批量操作完成：成功 {results["succeeded"]} 个，失败 {results["failed"]} 个',
+            'data': results
+        })
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

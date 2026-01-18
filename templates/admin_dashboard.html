@@ -243,11 +243,83 @@
             display: flex;
             gap: 8px;
             justify-content: flex-end;
+            align-items: center;
         }
 
         .record-actions .btn {
             padding: 6px 14px;
             font-size: 13px;
+        }
+
+        .record-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            margin-right: 12px;
+        }
+
+        .batch-actions {
+            padding: 20px 40px 0;
+            margin-bottom: 20px;
+        }
+
+        .batch-bar {
+            background: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .batch-info {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1a1a1a;
+        }
+
+        .batch-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .batch-buttons .btn {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .batch-progress {
+            width: 100%;
+            max-width: 400px;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .batch-progress.show {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #6e6e6e;
         }
 
         .empty-state {
@@ -336,6 +408,10 @@
             padding: 8px 16px;
             font-size: 13px;
         }
+
+        .record-card.selected {
+            box-shadow: 0 0 0 2px #667eea;
+        }
     </style>
 </head>
 <body>
@@ -345,6 +421,7 @@
             <p>管理和审核用户提交的AI生成案例</p>
         </div>
         <div class="header-actions">
+            <button class="btn btn-secondary" onclick="toggleSelectAll()">☑️ 全选</button>
             <button class="btn btn-secondary" onclick="showChangePasswordModal()">🔒 修改密码</button>
             <a href="/" class="btn btn-secondary">返回首页</a>
             <a href="/admin/logout" class="btn btn-danger">退出登录</a>
@@ -399,6 +476,26 @@
         <div id="recordsContainer" class="records-grid"></div>
     </div>
 
+    <!-- 批量操作栏 -->
+    <div class="batch-actions">
+        <div class="batch-bar">
+            <div class="batch-info">
+                已选择 <strong id="selectedCount">0</strong> 个案例
+            </div>
+            <div class="batch-buttons">
+                <button class="btn btn-success" onclick="batchApprove()" id="batchApproveBtn" disabled>✓ 批量通过</button>
+                <button class="btn btn-danger" onclick="batchReject()" id="batchRejectBtn" disabled>✗ 批量拒绝</button>
+                <button class="btn btn-danger" onclick="batchDelete()" id="batchDeleteBtn" disabled>🗑️ 批量删除</button>
+            </div>
+        </div>
+        <div class="batch-progress" id="batchProgress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            <div class="progress-text" id="progressText">处理中...</div>
+        </div>
+    </div>
+
     <!-- 拒绝原因弹窗 -->
     <div id="rejectModal" class="modal">
         <div class="modal-content">
@@ -446,6 +543,8 @@
         let currentRejectId = null;
         let currentPage = 1;
         const perPage = 20;
+        let selectedRecords = new Set();
+        let isAllSelected = false;
 
         // 页面加载时初始化
         document.addEventListener('DOMContentLoaded', function() {
@@ -559,6 +658,7 @@
                         <p>暂无案例记录</p>
                     </div>
                 `;
+                updateBatchButtons();
                 return;
             }
 
@@ -571,9 +671,10 @@
                 }[status] || '待审核';
 
                 const preview = getPreviewHtml(record);
+                const isSelected = selectedRecords.has(record.id);
 
                 return `
-                    <div class="record-card" data-id="${record.id}">
+                    <div class="record-card ${isSelected ? 'selected' : ''}" data-id="${record.id}">
                         <div class="record-status ${status}">${statusText}</div>
                         <div class="record-preview">
                             ${preview}
@@ -583,6 +684,10 @@
                             </div>
                         </div>
                         <div class="record-actions">
+                            <input type="checkbox" class="record-checkbox"
+                                   data-id="${record.id}"
+                                   ${isSelected ? 'checked' : ''}
+                                   onchange="toggleRecordSelection('${record.id}', this.checked)">
                             <a href="/record/${record.id}" target="_blank" class="btn btn-secondary">查看详情</a>
                             ${status === 'pending' ? `
                                 <button class="btn btn-success" onclick="reviewRecord('${record.id}', 'approve')">通过</button>
@@ -593,6 +698,173 @@
                     </div>
                 `;
             }).join('');
+
+            updateBatchButtons();
+        }
+
+        // 切换记录选择状态
+        function toggleRecordSelection(recordId, selected) {
+            if (selected) {
+                selectedRecords.add(recordId);
+            } else {
+                selectedRecords.delete(recordId);
+            }
+            updateBatchButtons();
+
+            // 更新卡片样式
+            const card = document.querySelector(`.record-card[data-id="${recordId}"]`);
+            if (card) {
+                if (selected) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            }
+        }
+
+        // 全选/取消全选
+        function toggleSelectAll() {
+            const checkboxes = document.querySelectorAll('.record-checkbox');
+            const allVisibleIds = Array.from(checkboxes).map(cb => cb.dataset.id);
+
+            if (isAllSelected) {
+                // 取消全选
+                allVisibleIds.forEach(id => selectedRecords.delete(id));
+                checkboxes.forEach(cb => {
+                    cb.checked = false;
+                    const card = cb.closest('.record-card');
+                    if (card) card.classList.remove('selected');
+                });
+                isAllSelected = false;
+            } else {
+                // 全选
+                allVisibleIds.forEach(id => selectedRecords.add(id));
+                checkboxes.forEach(cb => {
+                    cb.checked = true;
+                    const card = cb.closest('.record-card');
+                    if (card) card.classList.add('selected');
+                });
+                isAllSelected = true;
+            }
+
+            updateBatchButtons();
+        }
+
+        // 更新批量操作按钮状态
+        function updateBatchButtons() {
+            const count = selectedRecords.size;
+            document.getElementById('selectedCount').textContent = count;
+
+            document.getElementById('batchApproveBtn').disabled = count === 0;
+            document.getElementById('batchRejectBtn').disabled = count === 0;
+            document.getElementById('batchDeleteBtn').disabled = count === 0;
+        }
+
+        // 批量通过
+        async function batchApprove() {
+            const ids = Array.from(selectedRecords);
+            if (ids.length === 0) return;
+
+            if (!confirm(`确定要批量通过这 ${ids.length} 个案例吗？`)) {
+                return;
+            }
+
+            await batchOperation('approve', ids, '批量通过');
+        }
+
+        // 批量拒绝
+        async function batchReject() {
+            const ids = Array.from(selectedRecords);
+            if (ids.length === 0) return;
+
+            const reason = prompt(`请输入拒绝原因（将应用到所有 ${ids.length} 个案例）：`);
+            if (reason === null) return; // 用户取消
+
+            await batchOperation('reject', ids, '批量拒绝', { reason });
+        }
+
+        // 批量删除
+        async function batchDelete() {
+            const ids = Array.from(selectedRecords);
+            if (ids.length === 0) return;
+
+            if (!confirm(`⚠️ 确定要删除这 ${ids.length} 个案例吗？\n此操作不可恢复！`)) {
+                return;
+            }
+
+            await batchOperation('delete', ids, '批量删除');
+        }
+
+        // 批量操作通用函数
+        async function batchOperation(action, ids, actionName, options = {}) {
+            const progressBar = document.getElementById('batchProgress');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+
+            progressBar.classList.add('show');
+
+            let completed = 0;
+            const total = ids.length;
+            let failed = 0;
+
+            for (const recordId of ids) {
+                progressText.textContent = `${actionName}中... (${completed + 1}/${total})`;
+                const progress = ((completed + 1) / total * 100).toFixed(1);
+                progressFill.style.width = progress + '%';
+
+                try {
+                    let result;
+                    if (action === 'delete') {
+                        const response = await fetch(`/admin/api/record/${recordId}`, {
+                            method: 'DELETE'
+                        });
+                        result = await response.json();
+                    } else if (action === 'approve' || action === 'reject') {
+                        const response = await fetch(`/admin/api/review/${recordId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: action,
+                                reason: options.reason || ''
+                            })
+                        });
+                        result = await response.json();
+                    }
+
+                    if (!result.success) {
+                        console.error(`处理案例 ${recordId} 失败:`, result.error);
+                        failed++;
+                    }
+                } catch (error) {
+                    console.error(`处理案例 ${recordId} 出错:`, error);
+                    failed++;
+                }
+
+                completed++;
+            }
+
+            // 完成
+            progressFill.style.width = '100%';
+
+            if (failed === 0) {
+                progressText.textContent = `✓ ${actionName}完成！成功处理 ${total} 个案例`;
+            } else {
+                progressText.textContent = `⚠️ ${actionName}完成！成功 ${total - failed} 个，失败 ${failed} 个`;
+            }
+
+            // 清空选择
+            selectedRecords.clear();
+            isAllSelected = false;
+
+            // 延迟隐藏进度条
+            setTimeout(() => {
+                progressBar.classList.remove('show');
+                progressFill.style.width = '0%';
+            }, 3000);
+
+            // 刷新列表和统计
+            loadRecords();
+            loadStats();
         }
 
         // 获取预览HTML
