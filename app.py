@@ -8,6 +8,8 @@ import mimetypes
 import uuid
 import subprocess
 import functools
+import hashlib
+import base64
 
 try:
     import cv2
@@ -39,6 +41,9 @@ app.config['THUMBNAIL_FOLDER'] = 'thumbnails'
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB max file size
 app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'  # 用于session加密
 
+# .auth文件路径
+AUTH_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.auth')
+
 # 确保必要的文件夹存在
 for folder in [app.config['UPLOAD_FOLDER'], app.config['GENERATED_FOLDER'],
                app.config['OUTPUT_FOLDER'], app.config['DATA_FOLDER'],
@@ -63,6 +68,80 @@ ALLOWED_EXTENSIONS = {
 STATUS_PENDING = 'pending'  # 待审核
 STATUS_APPROVED = 'approved'  # 已审核通过
 STATUS_REJECTED = 'rejected'  # 已拒绝
+
+# ==================== 管理员认证函数 ====================
+
+def hash_password(password):
+    """使用SHA256哈希密码"""
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+def load_auth_data():
+    """加载.auth文件"""
+    if os.path.exists(AUTH_FILE):
+        try:
+            with open(AUTH_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[Auth] 读取.auth文件失败: {e}")
+            return None
+    return None
+
+def save_auth_data(auth_data):
+    """保存到.auth文件"""
+    try:
+        with open(AUTH_FILE, 'w', encoding='utf-8') as f:
+            json.dump(auth_data, f, ensure_ascii=False, indent=2)
+        # 设置文件权限为只有所有者可读写
+        os.chmod(AUTH_FILE, 0o600)
+        return True
+    except Exception as e:
+        print(f"[Auth] 保存.auth文件失败: {e}")
+        return False
+
+def check_admin_exists():
+    """检查是否已创建管理员账号"""
+    auth_data = load_auth_data()
+    return auth_data is not None
+
+def verify_admin_credentials(username, password):
+    """验证管理员账号密码"""
+    auth_data = load_auth_data()
+    if not auth_data:
+        return False
+
+    if auth_data.get('username') == username:
+        hashed_password = hash_password(password)
+        if hashed_password == auth_data.get('password_hash'):
+            return True
+
+    return False
+
+def create_admin_account(username, password):
+    """创建管理员账号"""
+    auth_data = {
+        'username': username,
+        'password_hash': hash_password(password),
+        'created_at': datetime.now().isoformat()
+    }
+
+    if save_auth_data(auth_data):
+        print(f"[Auth] 管理员账号创建成功: {username}")
+        return True
+    return False
+
+def update_admin_password(new_password):
+    """更新管理员密码"""
+    auth_data = load_auth_data()
+    if not auth_data:
+        return False
+
+    auth_data['password_hash'] = hash_password(new_password)
+    auth_data['updated_at'] = datetime.now().isoformat()
+
+    if save_auth_data(auth_data):
+        print(f"[Auth] 密码更新成功: {auth_data['username']}")
+        return True
+    return False
 
 def get_file_category(filename):
     """判断文件类型分类"""
@@ -732,79 +811,8 @@ def api_record_detail(record_id):
 # ==================== 管理员认证和审核管理功能 ====================
 
 def verify_linux_password(username, password):
-    """验证Linux系统用户密码（容器环境兼容版本）"""
-    try:
-        # 方法1: 使用python-pam模块（推荐用于容器环境）
-        try:
-            import pam
-            pam_auth = pam.pam()
-            if pam_auth.authenticate(username, password, service='sudo'):
-                print("[Auth] PAM验证成功")
-                return True
-            else:
-                print("[Auth] PAM验证失败")
-                return False
-        except ImportError:
-            print("[Auth] python-pam模块不可用，尝试其他方法")
-        except Exception as e:
-            print(f"[Auth] PAM验证异常: {e}")
-
-        # 方法2: 使用spwd模块直接验证密码哈希
-        try:
-            import spwd
-            import crypt
-
-            # 获取用户信息
-            try:
-                pwd = spwd.getspnam(username)
-            except KeyError:
-                print(f"[Auth] 用户 {username} 不存在")
-                return False
-
-            # 验证密码
-            if pwd.sp_pwdp and pwd.sp_pwdp in ['x', '*', '']:
-                print("[Auth] 密码在shadow中但无法直接验证（可能使用PAM）")
-                # 尝试使用crypt验证
-                crypted = crypt.crypt(password, pwd.sp_pwdp)
-                if crypted == pwd.sp_pwdp:
-                    print("[Auth] 密码验证成功（使用crypt）")
-                    return True
-                else:
-                    print("[Auth] 密码验证失败（使用crypt）")
-                    return False
-            else:
-                # 可以直接验证的密码哈希
-                crypted = crypt.crypt(password, pwd.sp_pwdp)
-                if crypted == pwd.sp_pwdp:
-                    print("[Auth] 密码验证成功（直接哈希比较）")
-                    return True
-                else:
-                    print("[Auth] 密码验证失败（直接哈希比较）")
-                    return False
-
-        except ImportError:
-            print("[Auth] spwd模块不可用")
-        except PermissionError as e:
-            print(f"[Auth] 权限不足读取shadow文件: {e}")
-            print("[Auth] 提示: 请确保容器以root权限运行")
-        except Exception as e:
-            print(f"[Auth] spwd验证异常: {e}")
-
-        # 方法3: 检查是否为root用户且密码不为空（简单的fallback）
-        if username == 'root' and password and len(password) > 0:
-            # 在容器环境中，如果其他方法都失败，可以添加一个简单的验证
-            # 注意：这不是最安全的方式，仅作为fallback
-            print("[Auth] 警告: 使用简化验证方式（仅检查非空）")
-            return True
-
-        print("[Auth] 所有验证方法均失败")
-        return False
-
-    except Exception as e:
-        print(f"[Auth] 验证过程出错: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
+    """验证管理员账号密码（使用.auth文件）"""
+    return verify_admin_credentials(username, password)
 
 def login_required(f):
     """管理员登录验证装饰器"""
@@ -819,32 +827,68 @@ def login_required(f):
 def admin_login():
     """管理员登录页面"""
     if request.method == 'GET':
+        # 检查是否已创建管理员账号
+        if not check_admin_exists():
+            # 未创建，显示创建账号页面
+            return render_template('admin_setup.html')
+        # 已创建，显示登录页面
         return render_template('admin_login.html')
 
-    # POST请求 - 处理登录
+    # POST请求 - 处理登录或创建账号
     data = request.get_json()
+    action = data.get('action', 'login')  # login 或 create
+
     username = data.get('username', '').strip()
     password = data.get('password', '')
 
     if not username or not password:
         return jsonify({'success': False, 'error': '用户名和密码不能为空'}), 400
 
-    # 验证是否为root用户
-    if username != 'root':
-        return jsonify({'success': False, 'error': '必须是root用户'}), 403
+    if action == 'create':
+        # 创建管理员账号
+        if check_admin_exists():
+            return jsonify({'success': False, 'error': '管理员账号已存在'}), 400
 
-    # 验证系统密码
-    if verify_linux_password(username, password):
-        session['logged_in'] = True
-        session['username'] = username
-        session.permanent = True  # 保持会话
-        return jsonify({
-            'success': True,
-            'message': '登录成功',
-            'redirect': '/admin/dashboard'
-        })
+        if len(username) < 3:
+            return jsonify({'success': False, 'error': '用户名至少3个字符'}), 400
+
+        if len(password) < 6:
+            return jsonify({'success': False, 'error': '密码至少6个字符'}), 400
+
+        if password != data.get('confirm_password', ''):
+            return jsonify({'success': False, 'error': '两次输入的密码不一致'}), 400
+
+        if create_admin_account(username, password):
+            session['logged_in'] = True
+            session['username'] = username
+            session.permanent = True
+            return jsonify({
+                'success': True,
+                'message': '管理员账号创建成功',
+                'redirect': '/admin/dashboard'
+            })
+        else:
+            return jsonify({'success': False, 'error': '创建账号失败'}), 500
+
+    elif action == 'login':
+        # 登录验证
+        if not check_admin_exists():
+            return jsonify({'success': False, 'error': '请先创建管理员账号'}), 400
+
+        if verify_admin_credentials(username, password):
+            session['logged_in'] = True
+            session['username'] = username
+            session.permanent = True
+            return jsonify({
+                'success': True,
+                'message': '登录成功',
+                'redirect': '/admin/dashboard'
+            })
+        else:
+            return jsonify({'success': False, 'error': '用户名或密码错误'}), 401
+
     else:
-        return jsonify({'success': False, 'error': '用户名或密码错误'}), 401
+        return jsonify({'success': False, 'error': '无效的操作'}), 400
 
 @app.route('/admin/logout')
 def admin_logout():
@@ -1054,6 +1098,40 @@ def admin_api_stats():
             'success': True,
             'data': stats
         })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/api/change-password', methods=['POST'])
+@login_required
+def admin_change_password():
+    """API: 修改管理员密码"""
+    try:
+        data = request.get_json()
+        old_password = data.get('old_password', '')
+        new_password = data.get('new_password', '')
+        confirm_password = data.get('confirm_password', '')
+
+        # 验证旧密码
+        username = session.get('username')
+        if not verify_admin_credentials(username, old_password):
+            return jsonify({'success': False, 'error': '原密码错误'}), 400
+
+        # 验证新密码
+        if len(new_password) < 6:
+            return jsonify({'success': False, 'error': '新密码至少6个字符'}), 400
+
+        if new_password != confirm_password:
+            return jsonify({'success': False, 'error': '两次输入的新密码不一致'}), 400
+
+        # 更新密码
+        if update_admin_password(new_password):
+            return jsonify({
+                'success': True,
+                'message': '密码修改成功'
+            })
+        else:
+            return jsonify({'success': False, 'error': '密码修改失败'}), 500
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

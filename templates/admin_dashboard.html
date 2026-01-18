@@ -331,6 +331,11 @@
             gap: 8px;
             justify-content: flex-end;
         }
+
+        .header-actions .btn {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -340,6 +345,7 @@
             <p>管理和审核用户提交的AI生成案例</p>
         </div>
         <div class="header-actions">
+            <button class="btn btn-secondary" onclick="showChangePasswordModal()">🔒 修改密码</button>
             <a href="/" class="btn btn-secondary">返回首页</a>
             <a href="/admin/logout" class="btn btn-danger">退出登录</a>
         </div>
@@ -404,6 +410,34 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeRejectModal()">取消</button>
                 <button class="btn btn-danger" onclick="confirmReject()">确认拒绝</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改密码弹窗 -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">修改管理员密码</div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px;">原密码：</label>
+                    <input type="password" id="oldPassword" placeholder="请输入当前密码"
+                           style="width: 100%; padding: 10px; border: 1px solid rgba(0,0,0,0.12); border-radius: 6px; font-size: 13px;">
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px;">新密码：</label>
+                    <input type="password" id="newPassword" placeholder="请输入新密码（至少6个字符）"
+                           style="width: 100%; padding: 10px; border: 1px solid rgba(0,0,0,0.12); border-radius: 6px; font-size: 13px;">
+                </div>
+                <div class="form-group">
+                    <label style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px;">确认新密码：</label>
+                    <input type="password" id="confirmNewPassword" placeholder="请再次输入新密码"
+                           style="width: 100%; padding: 10px; border: 1px solid rgba(0,0,0,0.12); border-radius: 6px; font-size: 13px;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeChangePasswordModal()">取消</button>
+                <button class="btn btn-primary" onclick="changePassword()">确认修改</button>
             </div>
         </div>
     </div>
@@ -686,6 +720,70 @@
                 }
             } catch (error) {
                 alert('删除失败: ' + error.message);
+            }
+        }
+
+        // 显示修改密码弹窗
+        function showChangePasswordModal() {
+            document.getElementById('changePasswordModal').classList.add('show');
+            document.getElementById('oldPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmNewPassword').value = '';
+            document.getElementById('oldPassword').focus();
+        }
+
+        // 关闭修改密码弹窗
+        function closeChangePasswordModal() {
+            document.getElementById('changePasswordModal').classList.remove('show');
+        }
+
+        // 修改密码
+        async function changePassword() {
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+
+            if (!oldPassword || !newPassword || !confirmNewPassword) {
+                alert('请填写所有字段');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                alert('新密码至少需要6个字符');
+                return;
+            }
+
+            if (newPassword !== confirmNewPassword) {
+                alert('两次输入的新密码不一致');
+                return;
+            }
+
+            if (oldPassword === newPassword) {
+                alert('新密码不能与原密码相同');
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        old_password: oldPassword,
+                        new_password: newPassword,
+                        confirm_password: confirmNewPassword
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('✓ ' + result.message);
+                    closeChangePasswordModal();
+                } else {
+                    alert('✗ ' + result.error);
+                }
+            } catch (error) {
+                alert('修改失败: ' + error.message);
             }
         }
     </script>

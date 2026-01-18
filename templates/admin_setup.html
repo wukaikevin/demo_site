@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理员登录 - 案例审核管理</title>
+    <title>创建管理员账号 - 案例审核管理</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
         body {
@@ -14,9 +14,9 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
-        .login-container {
+        .setup-container {
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             padding: 40px;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
@@ -24,25 +24,26 @@
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         }
 
-        .login-header {
+        .setup-header {
             text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 32px;
         }
 
-        .login-header h1 {
-            font-size: 28px;
+        .setup-header h1 {
+            font-size: 26px;
             font-weight: 600;
             color: #1a1a1a;
             margin-bottom: 8px;
         }
 
-        .login-header p {
+        .setup-header p {
             font-size: 14px;
             color: #6e6e6e;
+            line-height: 1.6;
         }
 
         .form-group {
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
 
         .form-group label {
@@ -73,7 +74,13 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-        .btn-login {
+        .password-strength {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #6e6e6e;
+        }
+
+        .btn-create {
             width: 100%;
             padding: 14px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -86,16 +93,12 @@
             transition: all 0.2s ease;
         }
 
-        .btn-login:hover {
+        .btn-create:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
         }
 
-        .btn-login:active {
-            transform: translateY(0);
-        }
-
-        .btn-login:disabled {
+        .btn-create:disabled {
             background: #ccc;
             cursor: not-allowed;
             transform: none;
@@ -126,18 +129,18 @@
             border: 1px solid #badfcc;
         }
 
-        .security-note {
+        .info-box {
             margin-top: 24px;
             padding: 16px;
-            background: #f9f9f9;
+            background: #e3f2fd;
             border-radius: 8px;
-            font-size: 12px;
-            color: #6e6e6e;
+            font-size: 13px;
+            color: #1976d2;
             line-height: 1.6;
         }
 
-        .security-note strong {
-            color: #1a1a1a;
+        .info-box strong {
+            color: #0d47a1;
         }
 
         .spinner {
@@ -157,23 +160,24 @@
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="login-header">
-            <h1>🔐 管理员登录</h1>
-            <p>案例审核管理平台</p>
+    <div class="setup-container">
+        <div class="setup-header">
+            <h1>🎉 创建管理员账号</h1>
+            <p>欢迎使用案例审核管理平台<br>请创建您的管理员账号以继续</p>
         </div>
 
         <div id="alert" class="alert"></div>
 
-        <form id="loginForm">
+        <form id="setupForm">
             <div class="form-group">
                 <label for="username">用户名</label>
                 <input
                     type="text"
                     id="username"
                     name="username"
-                    placeholder="请输入用户名（必须是root）"
+                    placeholder="请输入用户名（至少3个字符）"
                     required
+                    minlength="3"
                     autocomplete="username"
                 >
             </div>
@@ -184,29 +188,44 @@
                     type="password"
                     id="password"
                     name="password"
-                    placeholder="请输入root用户密码"
+                    placeholder="请输入密码（至少6个字符）"
                     required
-                    autocomplete="current-password"
+                    minlength="6"
+                    autocomplete="new-password"
+                >
+                <div class="password-strength">💡 建议使用字母、数字和特殊字符组合</div>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">确认密码</label>
+                <input
+                    type="password"
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    placeholder="请再次输入密码"
+                    required
+                    minlength="6"
+                    autocomplete="new-password"
                 >
             </div>
 
-            <button type="submit" class="btn-login" id="loginBtn">
-                <span id="loginText">登录</span>
+            <button type="submit" class="btn-create" id="createBtn">
+                <span id="createText">创建账号</span>
             </button>
         </form>
 
-        <div class="security-note">
-            <strong>🔒 安全说明：</strong><br>
-            • 管理员账号信息保存在服务器的 .auth 文件中<br>
-            • 首次使用时需要创建管理员账号<br>
-            • 请妥善保管账号密码，避免泄露
+        <div class="info-box">
+            <strong>📌 重要提示：</strong><br>
+            • 管理员账号信息将保存在 <code>.auth</code> 文件中<br>
+            • 请妥善保管您的账号密码，丢失后无法找回<br>
+            • 您可以在管理后台修改密码
         </div>
     </div>
 
     <script>
-        const loginForm = document.getElementById('loginForm');
-        const loginBtn = document.getElementById('loginBtn');
-        const loginText = document.getElementById('loginText');
+        const setupForm = document.getElementById('setupForm');
+        const createBtn = document.getElementById('createBtn');
+        const createText = document.getElementById('createText');
         const alertDiv = document.getElementById('alert');
 
         function showAlert(message, isError = false) {
@@ -221,22 +240,34 @@
         }
 
         function setLoading(loading) {
-            loginBtn.disabled = loading;
+            createBtn.disabled = loading;
             if (loading) {
-                loginText.innerHTML = '<span class="spinner"></span>登录中...';
+                createText.innerHTML = '<span class="spinner"></span>创建中...';
             } else {
-                loginText.textContent = '登录';
+                createText.textContent = '创建账号';
             }
         }
 
-        loginForm.addEventListener('submit', async function(e) {
+        setupForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
 
-            if (!username || !password) {
-                showAlert('请输入用户名和密码', true);
+            // 客户端验证
+            if (username.length < 3) {
+                showAlert('用户名至少需要3个字符', true);
+                return;
+            }
+
+            if (password.length < 6) {
+                showAlert('密码至少需要6个字符', true);
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                showAlert('两次输入的密码不一致', true);
                 return;
             }
 
@@ -249,9 +280,10 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        action: 'login',
+                        action: 'create',
                         username: username,
-                        password: password
+                        password: password,
+                        confirm_password: confirmPassword
                     })
                 });
 
@@ -263,7 +295,7 @@
                     showAlert('✗ ' + result.error, true);
                 }
             } catch (error) {
-                showAlert('✗ 登录失败: ' + error.message, true);
+                showAlert('✗ 创建失败: ' + error.message, true);
             } finally {
                 setLoading(false);
             }
