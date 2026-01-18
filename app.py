@@ -559,8 +559,9 @@ def submit_record():
         return jsonify({
             'success': True,
             'message': '记录保存成功',
-            'data': record,
-            'record_id': record['id']  # 明确返回record_id
+            'record_id': record['id'],  # 明确返回record_id（放在前面）
+            'detail_url': f"/record/{record['id']}",  # 直接返回详情页URL
+            'data': record
         })
 
     except Exception as e:

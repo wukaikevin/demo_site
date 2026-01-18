@@ -387,8 +387,9 @@
 
                     // 跳转到案例详情页
                     setTimeout(() => {
-                        const recordId = result.record_id || result.data.id;
-                        window.location.href = `/record/${recordId}`;
+                        // 优先使用后端返回的detail_url，其次自己构造
+                        const detailUrl = result.detail_url || `/record/${result.record_id || result.data.id}`;
+                        window.location.href = detailUrl;
                     }, 1000);
                 } else {
                     alertDiv.innerHTML = `
