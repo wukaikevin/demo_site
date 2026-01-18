@@ -514,8 +514,10 @@ def submit_record():
         total_size = sum(f['size'] for f in materials_list + results_list)
 
         # 构建新的数据结构
+        record_id = datetime.now().strftime('%Y%m%d%H%M%S%f')
+        print(f"[DEBUG] Generated record_id: {record_id}")  # 调试日志
         record = {
-            'id': datetime.now().strftime('%Y%m%d%H%M%S%f'),
+            'id': record_id,
             'created_at': datetime.now().isoformat(),
             'title': title,
             'app_id': app_id,
@@ -531,6 +533,7 @@ def submit_record():
                 'total_size': total_size
             }
         }
+        print(f"[DEBUG] Record object ID: {record['id']}")  # 调试日志
 
         # 保存完整记录到独立文件
         save_record(record)
@@ -551,6 +554,8 @@ def submit_record():
         records.insert(0, index_entry)  # 最新的记录在前
         save_records(records)
 
+        print(f"[DEBUG] Returning record_id: {record['id']}")  # 调试日志
+        print(f"[DEBUG] Full response data keys: {record.keys()}")  # 调试日志
         return jsonify({
             'success': True,
             'message': '记录保存成功',
